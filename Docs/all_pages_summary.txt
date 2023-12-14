@@ -1,0 +1,207 @@
+We have an python based application named Autonomous data collection agent. It is designed to collect data from various applications using endpoints on a predefined frequency. It dynamically builds and sends requests with ability to define filters, attributes, order, pagination etc for each endpoints separately. It also handles authentication of API dynamically including KeyCloak integration. It also has scheduler service which runs in background to keep runt he apis. The documentation from the various files is given below. Please understand and make a detailed document describing the application, features and functionalities.
+
+
+# Autonomous Data Collector Agent Docs
+
+## Summary
+
+`autonomousagent.py` manages a database for applications and endpoints.
+
+## Structure
+
+### `CurrentEndpoint`
+
+Holds endpoint data and attributes:
+
+```python
+endpoint: {
+    id: int, app_id: str, name: str, url_endpoint: str,
+    method: (GET | POST), payload: {table_name: str, ...},
+    filters: [{column_name: str, operator: (>|<|=|>=|<=|!=|<>), column_value: timestamp}],
+    page_size: int, last_sync: datetime, process_status: 0 | 1 | 2,
+    failed_count: int, failed_time: timestamp, status: 0 | 1
+}
+```
+
+### `CurrentApplication`
+
+Represents an application:
+
+```python
+application: {
+    id: int, name: str, short_name: str, host: str,
+    url_scheme: str, auth_type: str, auth_data: {}, dump_path: str,
+    sync_frequency: cron, last_sync: datetime, next_sync: datetime,
+    default_payload: {}, default_filters: [{...}], default_page_size: int,
+    process_status: 0 | 1 | 2, status: int
+}
+```
+
+### `Endpoints`
+
+Manages database endpoints.
+
+## Operations
+
+### Endpoints
+
+- Initialization, validation, CRUD operations.
+- Fetch and filter endpoints by ID, name, URL, query, status.
+- Update and remove single or multiple endpoints.
+
+### Applications
+
+- Similar initialization, validation, and CRUD operations as endpoints.
+- Fetch, filter, update, and remove applications by ID, name, status, query.
+
+## Conclusion
+
+`autonomousagent.py` allows robust management of a database for data collection agents.
+
+---
+
+# `database.py` Highlights
+
+## Key Features
+
+- **Initialization:** Creates paths for JSON databases.
+- **Retrieval:** Gets database path from the config.
+- **Setup:** Initializes new databases.
+- **Responses:** Handles database responses.
+- **CRUD:** Provides complete database interaction.
+- **Purging:** Offers methods to clear databases.
+- **Usage Examples:** Includes sample queries and CLI usage.
+
+# `fileencryption.py` Overview
+
+## Core Functions
+
+- **Initialization:** Sets up file encryption.
+- **Encryption Status:** Checks if enabled.
+- **Encryption/Decryption:** Offers methods for file content and whole files.
+
+## Conclusion
+
+Provides encryption functionality for file security.
+
+Here's a condensed version of the documentation that retains all the key information:
+
+# Autonomous Data Collector CLI Documentation
+
+## Overview
+`cli.py` provides a CLI for the Autonomous Data Collector Agent for user interaction and management tasks.
+
+## Structure
+
+### Modules
+Imports from `autonomous_data_collection_agent` and standard libraries.
+
+### Logging
+Configured to DEBUG level with log file details.
+
+### Typer
+Uses `Typer` library to define CLI commands.
+
+### Initialization
+`init` function initializes databases with configurable paths.
+
+## Commands
+
+### Threading
+- `enable_threading`: Toggles threading for file downloads.
+
+### Thread Count
+- `set_concurrent_threads`: Sets thread count based on CPU.
+
+### Encryption
+- `enable_encryption`: Toggles file encryption.
+- `reset_encryption_key`: Resets the encryption key.
+- `check_encryption`: Checks encryption status.
+
+### Data Management
+- `get_endpoints`: Retrieves endpoints.
+- `get_applications`: Retrieves applications.
+- `add_endpoint`, `list_endpoints`, `get_endpoint`, `update_endpoint`, `remove_endpoint`: Manage endpoints.
+- `add_application`, `list_applications`, `get_application`, `update_application`, `remove_application`: Manage applications.
+
+### Validation
+- `validate_datetime`: Validates datetime format.
+
+### Enums
+Classes for HTTP methods, URL schemes, and authentication types.
+
+## Entry Point
+Defines `cli()` as the main function if script is run directly.
+
+## Usage
+
+Run commands using `python cli.py <command> [options]`.
+
+### Examples:
+```bash
+python cli.py enable_threading --is-enabled true
+python cli.py set_concurrent_threads --thread-count 4
+python cli.py add_endpoint --name "Example" ... --status 1
+python cli.py list_endpoints
+python cli.py get_endpoint --endpoint-id 123
+python cli.py update_endpoint --endpoint-id 123 --name "Updated" ...
+python cli.py remove_endpoint --endpoint-id 123
+python cli.py add_application --name "New App" --short-name "NA" ...
+python cli.py list_applications
+python cli.py get_application --app-short-name "NA"
+python cli.py update_application --short-name "NA" ...
+python cli.py remove_application --app-short-name "NA"
+python cli.py enable_encryption --is-enabled true
+python cli.py reset_encryption_key
+python cli.py check_encryption
+```
+
+### Arguments
+Use `--help` with any command to get detailed usage information.
+
+Thank you for providing the context. Based on the information given, here is a summary of the `SchedulerService` in `scheduler.py`:
+
+**SchedulerService Summary:**
+
+The `SchedulerService` is a Windows service, part of the `autonomous_data_collection_agent` package, responsible for orchestrating and automating data collection tasks. This service is designed to work with multiple applications and endpoints to ensure timely data synchronization based on predefined schedules.
+
+**Key Features and Functions:**
+
+1. **Service Setup:**
+   - Inherits from Windows service framework classes to operate as a native service.
+   - Utilizes Python's `win32serviceutil` and related modules for service management.
+   - Employs a logging system to record service activity and potential issues.
+
+2. **Service Operation:**
+   - Features methods like `SvcStop` and `SvcDoRun` to handle the service lifecycle.
+   - Implements a `main` method acting as the service's main loop, invoking data collection tasks.
+
+3. **Threading and Concurrency:**
+   - Can be configured to utilize threading for processing multiple applications and endpoints simultaneously.
+   - Leverages the `concurrent.futures` module to manage thread pools.
+
+4. **Data Collection and Processing:**
+   - Processes applications and endpoints based on activation and scheduling.
+   - Handles HTTP requests and responses for data synchronization tasks.
+   - Applies filters to the collected data, with the ability to process date-time related filters specifically.
+
+5. **Authentication and Security:**
+   - Supports different authentication methods, including basic and Keycloak authentication for secure API interactions.
+   - Offers the option to encrypt saved response files, enhancing data security.
+
+6. **Scheduling:**
+   - Integrates with a scheduling system to manage when data collection tasks should occur.
+   - Uses `CronTab` to parse and work with cron expressions for task timing.
+
+7. **Database and Configuration Integration:**
+   - Accesses and manipulates application and endpoint data stored in databases.
+   - Relies on external configuration settings, potentially sourced from a `config.ini` file, to adapt to different environments and use cases.
+
+8. **Error Handling:**
+   - Features comprehensive error logging and exception handling to maintain service stability and provide troubleshooting information.
+
+9. **Service Initialization and Management:**
+   - Includes command-line interfacing to start, stop, install, or update the service as needed.
+   - Checks command-line arguments to control service behavior on startup.
+
+In conclusion, the `SchedulerService` class encapsulates the functionality necessary to maintain a scheduled data collection process as a Windows service. It demonstrates advanced features for concurrency, scheduling, HTTP communication, authentication, data security, and error handling, making it a critical component of the Autonomous Data Collector Agent infrastructure.

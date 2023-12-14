@@ -1,0 +1,234 @@
+# Autonomous Data Collection Agent Documentation
+
+## Overview
+
+The `autonomousagent.py` module serves as the controller for the Autonomous Data Collector Agent. It provides functionality for managing and manipulating both applications and endpoints in a database.
+
+## Classes
+
+### 1. `CurrentEndpoint`
+
+Represents an endpoint with its associated error code. The structure of the endpoint object is as follows:
+
+```python
+endpoint: {
+    id: int,
+    app_id: str,
+    name: str,
+    url_endpoint: str,
+    method: (GET | POST),
+    payload: {table_name: str, ...},
+    filters: [{
+        column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),
+        operator: (> | < | = | >= | <= | != | <> ),
+        column_value: DD-MM-YYYY hh:mm:ss
+    }],
+    page_size: int,
+    last_sync: date_time,
+    process_status: 0 | 1 | 2,
+    failed_count: int,
+    failed_time: DD-MM-YYYY hh:mm:ss,
+    status: 0 | 1
+}
+```
+
+### 2. `CurrentApplication`
+
+Represents a current application with its attributes `application` and `error`. The structure of the application object is as follows:
+
+```python
+application: {
+    id: int,
+    name: str,
+    short_name: str,
+    host: str,
+    url_scheme: str (http | https),
+    auth_type: str (None | KEYCLOAK | BASIC),
+    auth_data: {},
+    dump_path: str,
+    sync_frequency: str (cronjob),
+    last_sync: date_time,
+    next_sync: date_time,
+    default_payload: {},
+    default_filters: [{
+        column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),
+        operator: (> | < | = | >= | <= | != | <> ),
+        column_value: DD-MM-YYYY hh:mm:ss
+    }],
+    default_page_size: int,
+    process_status: 0 | 1 | 2,
+    status: int
+}
+```
+
+### 3. `Endpoints`
+
+Provides methods for managing and manipulating endpoint data in a database.
+
+## Functions
+
+### For Endpoints
+
+1. `__init__(db_path: str)`
+
+   Initializes an instance of the class with a database handler object.
+
+2. `validate_endpoint_data(data: dict) -> bool`
+
+   Validates the data dictionary for a specific endpoint, ensuring that the values are of the correct types.
+
+3. `add_endpoint(name: str, app_short_name: str, url_endpoint: str, method: str, payload: dict, filters: list[dict], page_size: int, last_sync: datetime, process_status: int, status: int) -> CurrentEndpoint`
+
+   Adds a new endpoint to the database with the provided parameters.
+
+4. `get_endpoint_list() -> list[dict]`
+
+   Returns the current endpoint list by reading items from the database handler.
+
+5. `get_endpoint_by_id(ENDPOINT_ID: str) -> CurrentEndpoint`
+
+   Returns the endpoint with the specified ID.
+
+6. `get_endpoint_by_name(name: str) -> CurrentEndpoint`
+
+   Returns the endpoint with a given name.
+
+7. `get_app_endpoint_by_name(app_id: str, name: str) -> CurrentEndpoint`
+
+   Returns the endpoint with a specific name for a given app ID.
+
+8. `get_endpoint_by_url(url_endpoint: str) -> CurrentEndpoint`
+
+   Returns the endpoint by name based on the provided URL endpoint.
+
+9. `get_endpoints_by_query(query: str) -> list[dict]`
+
+   Returns a list of endpoints filtered by a custom query.
+
+10. `get_app_endpoints(app_short_name: str) -> list[dict]`
+
+    Returns the current endpoint list for a given application short name.
+
+11. `get_app_endpoints_by_process_status(app_short_name: str, process_status: int) -> list[dict]`
+
+    Returns the current endpoint list for a given application filtered by process status.
+
+12. `get_app_endpoints_by_status(app_short_name: str, status: int) -> list[dict]`
+
+    Returns the current endpoint list for an application filtered by status.
+
+13. `update_endpoint(ENDPOINT_ID: int, data: dict) -> CurrentEndpoint`
+
+    Updates an endpoint with the provided data and returns the updated endpoint along with any errors encountered.
+
+14. `update_endpoint_status(ENDPOINT_ID: int, status: int) -> CurrentEndpoint`
+
+    Updates the status of an endpoint in a database and returns the updated endpoint along with any error that occurred during the update.
+
+15. `update_endpoint_process_status(ENDPOINT_ID: int, process_status: int) -> CurrentEndpoint`
+
+    Updates the process status of an endpoint in a database.
+
+16. `update_endpoints_by_query(query_str: str, data: dict) -> list[dict]`
+
+    Updates endpoints based on a query string and returns the updated endpoints.
+
+17. `remove_endpoint(ENDPOINT_ID: int) -> CurrentEndpoint`
+
+    Removes an endpoint from the database using its id or index and returns the result.
+
+18. `remove_all_endpoints() -> CurrentEndpoint`
+
+    Removes all endpoints from the database.
+
+19. `remove_all_endpoints_by_app(app_short_name: str) -> CurrentEndpoint`
+
+    Removes all endpoints of a specific application from the database.
+
+### For Applications
+
+1. `__init__(db_path: str)`
+
+   Initializes an instance of the class with a database handler object.
+
+2. `is_valid_cronjob(sync_frequency: str) -> Union[str, None]`
+
+   Checks if a given sync frequency string matches the format of a cron job.
+
+3. `check_and_create_directory(path: str) -> Union[str, None]`
+
+   Checks if a directory exists and creates it if it doesn’t.
+
+4. `validate_app_data(data: dict) -> bool`
+
+   Validates the data dictionary for a specific set of keys and their corresponding value types.
+
+5. `add_application(name: str, short_name: str, host: str, url_scheme: str, auth_type: str, auth_data: dict, dump_path: str, sync_frequency: str, last_sync: datetime, next_sync: datetime, default_payload: dict, default_filters: list[dict], default_page_size: int, process_status: int, status: int) -> CurrentApplication`
+
+   Adds a new application to the database with various parameters and performs validation checks.
+
+6. `get_applications() -> list[dict]`
+
+   Returns the current application list.
+
+7. `get_app_by_id(APP_ID: str) -> CurrentApplication`
+
+   Returns the endpoint of an application based on its ID.
+
+8. `get_app_by_name(name: str) -> CurrentApplication`
+
+   Returns the current application by name.
+
+9. `get_app_by_short_name(short_name: str) -> CurrentApplication`
+
+   Returns the current application based on its short name.
+
+10. `get_apps_by_status(status: int) -> list[dict]`
+
+    Returns a list of application dictionaries filtered by a given status.
+
+11. `get_apps_by_query(query: str) -> list[dict]`
+
+    Returns a filtered list of applications based on a custom query.
+
+12. `update_application(APP_ID: int, data: dict) -> CurrentApplication`
+
+    Updates an application with the provided data and returns the updated application along with any errors encountered.
+
+13. `
+
+update_app_status(APP_ID: int, status: int) -> CurrentApplication`
+
+    Updates the status of an application based on the provided status value.
+
+14. `update_app_process_status(APP_ID: int, process_status: int) -> CurrentApplication`
+
+    Updates the process status of an application in a database.
+
+15. `update_apps_by_query(query_str: str, data: dict) -> list[dict]`
+
+    Updates applications based on a query string and returns a list of updated items.
+
+16. `delete_apps_by_query(query_str: str) -> list[dict]`
+
+    Deletes applications based on a query string and returns the list of deleted items.
+
+17. `remove_application(APP_ID: int) -> CurrentApplication`
+
+    Removes an application from the database using its id or index.
+
+18. `remove_all_applications() -> CurrentApplication`
+
+    Removes all applications from the database.
+
+19. `get_application_id_by_name(app_short_name: str) -> str`
+
+    Retrieves the application ID based on the given application short name.
+
+20. `get_endpoint_id_by_name(endpoint_name: str) -> int`
+
+    Retrieves the ID of an endpoint by its name from the database.
+
+## Conclusion
+
+The `autonomousagent.py` module provides comprehensive functionality for managing both applications and endpoints in a database. Users can easily add, retrieve, update, and delete applications and endpoints, making it a powerful tool for autonomous data collection.

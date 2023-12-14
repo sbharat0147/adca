@@ -1,0 +1,58 @@
+**SchedulerService Documentation**
+
+The `SchedulerService` class in `scheduler.py` represents a Windows service designed for scheduling and processing data collection tasks. Here's a detailed breakdown of its features and functionalities:
+
+1. **Imports:**
+   - The script imports various modules, including `win32serviceutil`, `win32service`, `win32event`, `servicemanager`, `socket`, `CronTab`, `json`, `os`, `requests`, `logging`, `concurrent.futures`, `base64`, and `urllib`.
+   - It also imports several modules from the `autonomous_data_collection_agent` package, such as `fileencryption`, `keycloak_auth`, `autonomousagent`, and others.
+
+2. **Logging Setup:**
+   - The script sets up logging using the `logging` module, configuring it to write log entries to a file.
+
+3. **SchedulerService Class:**
+   - Inherits from `win32serviceutil.ServiceFramework` to create a Windows service.
+   - Defines service name (`_svc_name_`) and display name (`_svc_display_name_`).
+   - Initializes necessary components, including a stop event and network timeout.
+
+4. **Service Lifecycle Methods:**
+   - `SvcStop`: Marks the service status as "stop pending" and signals the service to stop.
+   - `SvcDoRun`: Logs the start of the service and calls the `main` method.
+
+5. **Main Processing Loop:**
+   - The `main` method is the core of the service.
+   - Checks if threading is enabled and processes applications accordingly, with an option for concurrent threads.
+   - Uses a loop to repeatedly call `process_applications` based on threading configuration.
+
+6. **Application Processing:**
+   - `process_applications`: Processes applications and their associated endpoints sequentially or using multithreading.
+   - Retrieves active applications and iterates over them, checking for scheduled synchronizations.
+   - Calls `process_endpoint` for each endpoint in an application.
+
+7. **Endpoint Processing:**
+   - `process_endpoint`: Processes an endpoint by making an HTTP request, saving the response, and updating synchronization details.
+   - Utilizes multithreading if enabled, with configurable thread count.
+   - Handles exceptions and logs errors.
+
+8. **Data Filters Processing:**
+   - `process_filters`: Processes a list of filters, replacing empty or None values with the current datetime for specific columns.
+
+9. **HTTP Request Handling:**
+   - `make_request`: Constructs and sends HTTP requests based on application and endpoint data.
+   - Uses `requests` module and handles GET and POST requests.
+   - Supports basic and Keycloak authentication.
+
+10. **Response Handling:**
+    - `save_response`: Saves API responses to JSON files, encrypts them if file encryption is enabled.
+
+11. **Database Access Methods:**
+    - `_get_endpoints` and `_get_applications`: Retrieve instances of `autonomousagent.Endpoints` and `autonomousagent.Applications` respectively.
+
+12. **Service Initialization:**
+    - The script includes a block at the end to run the service when executed directly.
+    - Checks command-line arguments and either initializes the service or handles command-line arguments.
+
+13. **Configuration and Error Handling:**
+    - Relies on configurations from the `autonomous_data_collection_agent` package.
+    - Logs errors and exceptions with detailed information.
+
+In summary, the `SchedulerService` is a robust Windows service designed for scheduling and executing data collection tasks with support for multithreading, authentication, and flexible configurations. It interacts with the `autonomous_data_collection_agent` package to manage applications, endpoints, and related data.

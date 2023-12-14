@@ -1,0 +1,22 @@
+.. Autonomous Data Collector Agent documentation master file, created by
+   sphinx-quickstart on Mon Nov  6 14:38:46 2023.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+Welcome to Autonomous Data Collector Agent's documentation!
+===========================================================
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   modules
+   autonomous_data_collection_agent
+   autonomous_data_collection_agent.tests
+   
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

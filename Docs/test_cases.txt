@@ -1,0 +1,228 @@
+# Test Cases Document
+
+## 1. Basic Commands
+
+### 1.1 `enable-threading`
+- **Test Case ID:** TC001
+- **Description:** Verify that threading is enabled successfully.
+- **Test Steps:**
+  1. Execute the command: `enable-threading -e True`
+  2. **Expected Result:** Exit code is 0, and the output contains "Threading is set to enabled."
+
+### 1.2 `set-concurrent-threads`
+- **Test Case ID:** TC002
+- **Description:** Test setting concurrent threads count.
+- **Test Steps:**
+  1. Execute the command: `set-concurrent-threads 4 -f`
+  2. **Expected Result:** Exit code is 0, and the output contains "Set Concurrent Threads Count to: 4."
+
+### 1.3 `enable-encryption`
+- **Test Case ID:** TC003
+- **Description:** Verify the successful enabling of encryption.
+- **Test Steps:**
+  1. Execute the command: `enable-encryption`
+  2. **Expected Result:** Exit code is 0, and the output contains "Encryption is set to enabled."
+
+### 1.4 `reset-encryption-key`
+- **Test Case ID:** TC004
+- **Description:** Test the functionality of resetting the encryption key.
+- **Test Steps:**
+  1. Execute the command: `reset-encryption-key`
+  2. Provide input 'y' when prompted.
+  3. **Expected Result:** Exit code is 0, and the output contains "Encryption key is reset."
+
+### 1.5 `check-encryption`
+- **Test Case ID:** TC005
+- **Description:** Verify the status of encryption.
+- **Test Steps:**
+  1. Execute the command: `check-encryption`
+  2. **Expected Result:** Exit code is 0, and the output contains "Encryption is" indicating the current encryption status.
+
+## 2. Application Management
+
+### 2.1 `add-app`
+- **Test Case ID:** TC006
+- **Description:** Test adding a new application.
+- **Test Steps:**
+  1. Execute the command: `add-app SampleApp --short-name sampleapp --host example.com --dump-path D:\scrapped_data\also`
+  2. **Expected Result:** Exit code is 0, and the output contains "Application 'SampleApp' was added."
+
+### 2.2 `update-app`
+- **Test Case ID:** TC007
+- **Description:** Test updating application parameters.
+- **Test Steps:**
+  1. Execute the command: `update-app <application_id> --name "New Name" --host "new-host" ...`
+  2. **Expected Result:** Exit code is 0, and the output contains "Application 'New Name' was updated successfully."
+
+### 2.3 `list-apps`
+- **Test Case ID:** TC008
+- **Description:** Test listing all applications.
+- **Test Steps:**
+  1. Execute the command: `list-apps`
+  2. **Expected Result:** Exit code is 0, and the output contains "Application List:" with a list of applications.
+
+### 2.4 `get-app`
+- **Test Case ID:** TC009
+- **Description:** Test retrieving application details.
+- **Test Steps:**
+  1. Execute the command: `get-app <application_id>`
+  2. **Expected Result:** Exit code is 0, and the output contains detailed information about the specified application.
+
+### 2.5 `remove-app`
+- **Test Case ID:** TC010
+- **Description:** Test removing an application.
+- **Test Steps:**
+  1. Execute the command: `remove-app <application_id> --force`
+  2. **Expected Result:** Exit code is 0, and the output contains "Application # <application_id> was removed."
+
+### 2.6 `clear-apps`
+- **Test Case ID:** TC011
+- **Description:** Test clearing all applications.
+- **Test Steps:**
+  1. Execute the command: `clear-apps --force`
+  2. **Expected Result:** Exit code is 0, and the output contains "All applications were removed."
+
+## 3. Endpoint Management
+
+### 3.1 `add-endpoint`
+- **Test Case ID:** TC012
+- **Description:** Test adding a new endpoint to an application.
+- **Test Steps:**
+  1. Execute the command: `add-endpoint "Sample Endpoint" --app-name sampleapp --endpoint sample-api-endpoint ...`
+  2. **Expected Result:** Exit code is 0, and the output contains "was added."
+
+### 3.2 `update-endpoint`
+- **Test Case ID:** TC013
+- **Description:** Test updating endpoint parameters.
+- **Test Steps:**
+  1. Execute the command: `update-endpoint <endpoint_id> --app-name updatedapp ...`
+  2. **Expected Result:** Exit code is 0, and the output contains "updated successfully."
+
+### 3.3 `list-endpoints`
+- **Test Case ID:** TC014
+- **Description:** Test listing all endpoints.
+- **Test Steps:**
+  1. Execute the command: `list-endpoints`
+  2. **Expected Result:** Exit code is 0, and the output contains "Endpoint List" with a list of endpoints.
+
+### 3.4 `get-endpoint`
+- **Test Case ID:** TC015
+- **Description:** Test retrieving endpoint details.
+- **Test Steps:**
+  1. Execute the command: `get-endpoint <endpoint_id>`
+  2. **Expected Result:** Exit code is 0, and the output contains detailed information about the specified endpoint.
+
+### 3.5 `get-endpoint-by-name`
+- **Test Case ID:** TC016
+- **Description:** Test retrieving endpoint details by name.
+- **Test Steps:**
+  1. Execute the command: `get-endpoint-by-name "Sample Endpoint"`
+  2. **Expected Result:** Exit code is 0, and the output contains detailed information about the specified endpoint.
+
+### 3.6 `remove-endpoint`
+- **Test Case ID:** TC017
+- **Description:** Test removing an endpoint.
+- **Test Steps:**
+  1. Execute the command: `remove-endpoint <endpoint_id> --force`
+  2. **Expected Result:** Exit code is 0, and the output contains "was removed."
+
+### 3.7 `remove-app-endpoints`
+- **Test Case ID:** TC018
+- **Description:** Test removing all endpoints for an application.
+- **Test Steps:**
+  1. Execute the command: `remove-app-endpoints sampleapp --force`
+  2. **Expected Result:** Exit code is 0, and the output contains "was removed."
+
+### 3.8 `clear-endpoints`
+- **Test Case ID:** TC019
+- **Description:** Test clearing all endpoints.
+- **Test Steps:**
+  1. Execute the command: `clear-endpoints --force`
+  2. **Expected Result:** Exit code is 0, and the output contains "All endpoints were removed."
+
+
+
+## 4. Advanced Commands
+
+### 4.1 `generate-fake`
+- **Test Case ID:** TC020
+- **Description:** Test generating fake application and endpoint data.
+- **Test Steps:**
+  1. Execute the command: `generate-fake --apps 5 --endpoints 10`
+  2. **Expected Result:** Exit code is 0, and the output contains "Random Application Data and endpoint data generated successfully!"
+
+### 4.2 `test-scheduler`
+- **Test Case ID:** TC021
+- **Description:** Test the test scheduler command.
+- **Test Steps:**
+  1. Execute the command: `test-scheduler`
+  2. **Expected Result:** Exit code is 0 (specific expected output may vary based on the test scenario).
+
+## 5. Application Status Management
+
+### 5.1 `update-app-status`
+- **Test Case ID:** TC022
+- **Description:** Test updating the status of an application.
+- **Test Steps:**
+  1. Execute the command: `update-app-status <application_id> --status 0`
+  2. **Expected Result:** Exit code is 0, and the output contains "Application # <application_id> updated successfully with status: 0."
+
+### 5.2 `update-app-process-status`
+- **Test Case ID:** TC023
+- **Description:** Test updating the process status of an application.
+- **Test Steps:**
+  1. Execute the command: `update-app-process-status <application_id> --process-status 2`
+  2. **Expected Result:** Exit code is 0, and the output contains "Application # <application_id> updated successfully with process status: 2."
+
+## 6. Miscellaneous Commands
+
+### 6.1 `--version`
+- **Test Case ID:** TC024
+- **Description:** Test checking the application version.
+- **Test Steps:**
+  1. Execute the command: `--version`
+  2. **Expected Result:** Exit code is 0, and the output contains the current application version.
+
+### 6.2 `--help`
+- **Test Case ID:** TC025
+- **Description:** Test displaying the help information.
+- **Test Steps:**
+  1. Execute the command: `--help`
+  2. **Expected Result:** Exit code is 0, and the output contains relevant help information.
+
+### 6.3 `<application_name>`
+- **Test Case ID:** TC026
+- **Description:** Test running the main application command.
+- **Test Steps:**
+  1. Execute the command: `<application_name>`
+  2. **Expected Result:** Exit code is 0 (specific expected output may vary based on the application).
+
+## Test Environment
+
+- **Python version:** [Specify version]
+- **Pytest version:** [Specify version]
+- **Operating System:** [Specify OS]
+
+## Dependencies
+
+- `typer`
+- Other relevant dependencies
+
+## Test Deliverables
+
+- Automated test scripts for each test case.
+- Manual test case execution results.
+- Test environment setup instructions.
+
+## Test Schedule
+
+The testing process is expected to be completed within [Specify time frame], including both automated and manual testing.
+
+## Test Risks
+
+- Dependency on external services for certain commands.
+- Compatibility issues with specific Python versions.
+
+## Test Sign-off
+
+[Specify the name and role of the person responsible for approving the test results.]

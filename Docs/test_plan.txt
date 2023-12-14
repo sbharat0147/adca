@@ -1,0 +1,276 @@
+# Test Plan Document
+
+## Introduction
+
+The test plan aims to ensure the reliability and functionality of the `autonomous_data_collection_agent` Python application. The application provides a command-line interface (CLI) for managing autonomous agents responsible for data collection.
+
+## Objectives
+
+1. Verify the correct execution of basic commands.
+2. Ensure that application settings and configurations are accurately updated.
+3. Validate the addition, retrieval, and removal of applications and endpoints.
+4. Confirm the proper functioning of advanced commands, such as encryption and threading.
+5. Check the handling of edge cases and error scenarios.
+
+## Test Scope
+
+The testing will cover the following aspects of the application:
+
+1. **Basic Commands:**
+   - `enable-threading`
+   - `set-concurrent-threads`
+   - `enable-encryption`
+   - `reset-encryption-key`
+   - `check-encryption`
+
+2. **Application Management:**
+   - `add-app`
+   - `update-app`
+   - `list-apps`
+   - `get-app`
+   - `remove-app`
+   - `clear-apps`
+
+3. **Endpoint Management:**
+   - `add-endpoint`
+   - `update-endpoint`
+   - `list-endpoints`
+   - `get-endpoint`
+   - `get-endpoint-by-name`
+   - `remove-endpoint`
+   - `remove-app-endpoints`
+   - `clear-endpoints`
+
+4. **Advanced Commands:**
+   - `generate-fake`
+   - `test-scheduler`
+
+5. **Application Status Management:**
+   - `update-app-status`
+   - `update-app-process-status`
+
+6. **Miscellaneous Commands:**
+   - `--version`
+   - `--help`
+   - `--version`
+
+## Test Approach
+
+1. **Automated Testing:**
+   - Use the Pytest framework to automate the execution of test cases.
+   - Utilize fixtures for setup and teardown operations.
+
+2. **Manual Testing:**
+   - Manually execute commands and observe the CLI output.
+   - Manually inspect the application state and configurations.
+
+3. **Edge Cases:**
+   - Test commands with boundary values and unexpected inputs.
+   - Validate error messages for invalid command usage.
+
+## Test Cases
+
+### 1. Basic Commands
+
+#### 1.1 `enable-threading`
+   - **Test Scenario:** Verify that threading is enabled successfully.
+   - **Test Steps:**
+     1. Execute the command: `enable-threading -e True`
+     2. Check the exit code and output for success.
+
+#### 1.2 `set-concurrent-threads`
+   - **Test Scenario:** Test setting concurrent threads count.
+   - **Test Steps:**
+     1. Execute the command: `set-concurrent-threads 4 -f`
+     2. Check the exit code and output for success.
+
+#### 1.3 `enable-encryption`
+   - **Test Scenario:** Verify the successful enabling of encryption.
+   - **Test Steps:**
+     1. Execute the command: `enable-encryption`
+     2. Check the exit code and output for success.
+
+#### 1.4 `reset-encryption-key`
+   - **Test Scenario:** Test the functionality of resetting the encryption key.
+   - **Test Steps:**
+     1. Execute the command: `reset-encryption-key`
+     2. Provide input 'y' when prompted.
+     3. Check the exit code and output for success.
+
+#### 1.5 `check-encryption`
+   - **Test Scenario:** Verify the status of encryption.
+   - **Test Steps:**
+     1. Execute the command: `check-encryption`
+     2. Check the exit code and output for the encryption status.
+
+### 2. Application Management
+
+#### 2.1 `add-app`
+   - **Test Scenario:** Test adding a new application.
+   - **Test Steps:**
+     1. Execute the command: `add-app SampleApp --short-name sampleapp --host example.com --dump-path D:\scrapped_data\also`
+     2. Check the exit code and output for success.
+
+#### 2.2 `update-app`
+   - **Test Scenario:** Test updating application parameters.
+   - **Test Steps:**
+     1. Execute the command: `update-app <application_id> --name "New Name" --host "new-host" ...`
+     2. Check the exit code and output for success.
+
+#### 2.3 `list-apps`
+   - **Test Scenario:** Test listing all applications.
+   - **Test Steps:**
+     1. Execute the command: `list-apps`
+     2. Check the exit code and output for the list of applications.
+
+#### 2.4 `get-app`
+   - **Test Scenario:** Test retrieving application details.
+   - **Test Steps:**
+     1. Execute the command: `get-app <application_id>`
+     2. Check the exit code and output for application details.
+
+#### 2.5 `remove-app`
+   - **Test Scenario:** Test removing an application.
+   - **Test Steps:**
+     1. Execute the command: `remove-app <application_id> --force`
+     2. Check the exit code and output for success.
+
+#### 2.6 `clear-apps`
+   - **Test Scenario:** Test clearing all applications.
+   - **Test Steps:**
+     1. Execute the command: `clear-apps --force`
+     2. Check the exit code and output for success.
+
+### 3. Endpoint Management
+
+#### 3.1 `add-endpoint`
+   - **Test Scenario:** Test adding a new endpoint to an application.
+   - **Test Steps:**
+     1. Execute the command: `add-endpoint "Sample Endpoint" --app-name sampleapp --endpoint sample-api-endpoint ...`
+     2. Check the exit code and output for success.
+
+#### 3.2 `update-endpoint`
+   - **Test Scenario:** Test updating endpoint parameters.
+   - **Test Steps:**
+     1. Execute the command: `update-endpoint <endpoint_id> --app-name updatedapp ...`
+     2. Check the exit code and output for success.
+
+#### 3.3 `list-endpoints`
+   - **Test Scenario:** Test listing all endpoints.
+   - **Test Steps:**
+     1. Execute the command: `list-endpoints`
+     2. Check the exit code and output for the list of endpoints.
+
+#### 3.4 `get-endpoint`
+   - **Test Scenario:** Test retrieving endpoint details.
+   - **Test Steps:**
+     1. Execute the command: `get-endpoint <endpoint_id>`
+     2. Check the exit code and output for endpoint details.
+
+#### 3.5 `get-endpoint-by-name`
+   - **Test Scenario:** Test retrieving endpoint details by name.
+   - **Test Steps:**
+     1. Execute the command: `get-endpoint-by-name "Sample Endpoint"`
+     2. Check the exit code and output for endpoint details.
+
+#### 3.6 `remove-endpoint`
+   - **Test Scenario:** Test removing an endpoint.
+   - **Test Steps:**
+     1. Execute the command: `remove-endpoint <endpoint_id> --force`
+     2. Check the exit code and output for success.
+
+#### 
+
+3.7 `remove-app-endpoints`
+   - **Test Scenario:** Test removing all endpoints for an application.
+   - **Test Steps:**
+     1. Execute the command: `remove-app-endpoints sampleapp --force`
+     2. Check the exit code and output for success.
+
+#### 3.8 `clear-endpoints`
+   - **Test Scenario:** Test clearing all endpoints.
+   - **Test Steps:**
+     1. Execute the command: `clear-endpoints --force`
+     2. Check the exit code and output for success.
+
+### 4. Advanced Commands
+
+#### 4.1 `generate-fake`
+   - **Test Scenario:** Test generating fake application and endpoint data.
+   - **Test Steps:**
+     1. Execute the command: `generate-fake --apps 5 --endpoints 10`
+     2. Check the exit code and output for success.
+
+#### 4.2 `test-scheduler`
+   - **Test Scenario:** Test the test scheduler command.
+   - **Test Steps:**
+     1. Execute the command: `test-scheduler`
+     2. Check the exit code and output for success.
+
+### 5. Application Status Management
+
+#### 5.1 `update-app-status`
+   - **Test Scenario:** Test updating the status of an application.
+   - **Test Steps:**
+     1. Execute the command: `update-app-status <application_id> --status 0`
+     2. Check the exit code and output for success.
+
+#### 5.2 `update-app-process-status`
+   - **Test Scenario:** Test updating the process status of an application.
+   - **Test Steps:**
+     1. Execute the command: `update-app-process-status <application_id> --process-status 2`
+     2. Check the exit code and output for success.
+
+### 6. Miscellaneous Commands
+
+#### 6.1 `--version`
+   - **Test Scenario:** Test checking the application version.
+   - **Test Steps:**
+     1. Execute the command: `--version`
+     2. Check the exit code and output for the current application version.
+
+#### 6.2 `--help`
+   - **Test Scenario:** Test displaying the help information.
+   - **Test Steps:**
+     1. Execute the command: `--help`
+     2. Check the exit code and output for the help information.
+
+#### 6.3 `--version`
+   - **Test Scenario:** Test running the main application command.
+   - **Test Steps:**
+     1. Execute the command: `<application_name>`
+     2. Check the exit code for success.
+
+## Test Environment
+
+- Python version: [Specify version]
+- Pytest version: [Specify version]
+- Operating System: [Specify OS]
+
+## Dependencies
+
+- `typer`
+- Other relevant dependencies
+
+## Test Deliverables
+
+- Automated test scripts for each test case.
+- Manual test case execution results.
+- Test environment setup instructions.
+
+## Test Schedule
+
+The testing process is expected to be completed within [Specify time frame], including both automated and manual testing.
+
+## Test Risks
+
+- Dependency on external services for certain commands.
+- Compatibility issues with specific Python versions.
+
+## Test Sign-off
+
+[Specify the name and role of the person responsible for approving the test results.]
+
+---
+
+This test plan is designed to cover a comprehensive set of scenarios for the `autonomous_data_collection_agent` application, ensuring the robustness and correctness of its features.

@@ -1,0 +1,259 @@
+#--
+
+import configparser
+from cryptography.fernet import Fernet
+import typer
+import os
+
+from autonomous_data_collection_agent import DB_WRITE_ERROR, DIR_ERROR, FILE_ERROR, SUCCESS, __app_name__
+
+##
+
+CONFIG_DIR_PATH = os.path.join(os.getcwd(), __app_name__)
+CONFIG_FILE_PATH = CONFIG_DIR_PATH + "/" + "config.ini"
+LOG_FILE_PATH = CONFIG_DIR_PATH  + "/" +  "app.log"
+
+def init_app(db_paths: []) -> int:
+    #--
+    config_code = _init_config_file()
+    if config_code != SUCCESS:
+        return config_code
+    database_code = _create_database(db_paths)
+    if database_code != SUCCESS:
+        return database_code
+
+    logfile_error_code = _create_logfile(LOG_FILE_PATH)
+    if logfile_error_code != SUCCESS:
+        return logfile_error_code
+    else:
+        typer.secho(f"Logfile is successfully created at {LOG_FILE_PATH}", fg=typer.colors.BRIGHT_MAGENTA)
+   
+    encryption_error_code = _create_encryption_key()
+    if encryption_error_code != SUCCESS:
+        return encryption_error_code
+    else:
+        typer.secho(f"Encryption key generated succesfully. ", fg=typer.colors.YELLOW)
+    
+
+    keycloak_error_code = _create_keycloak_config()
+    if keycloak_error_code != SUCCESS:
+        return keycloak_error_code
+    else:
+        typer.secho(f"Keycloak config basic setup done. Please update details for realtime use.", fg=typer.colors.BLUE)
+
+    
+    threading_error_code = _create_threading_config()
+    if threading_error_code != SUCCESS:
+        return threading_error_code
+    else:
+        typer.secho(f"Threading config basic setup done. Please update details for realtime use.", fg=typer.colors.BRIGHT_CYAN)
+
+    return SUCCESS
+
+
+def _init_config_file() -> int:
+    #--
+    try:
+        CONFIG_DIR_PATH.mkdir(exist_ok=True)
+    except OSError:
+        return DIR_ERROR
+    try:
+        CONFIG_FILE_PATH.touch(exist_ok=True)
+    except OSError:
+        return FILE_ERROR
+    return SUCCESS
+
+def _create_threading_config() -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    config_parser.read(CONFIG_FILE_PATH)
+    config_parser["Threading"] = {"enabled": True, "concurrent_threads": 2 }
+
+    try:
+        with CONFIG_FILE_PATH.open("w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def enable_threading(is_enabled: bool = True) -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    ##
+
+    config_parser.read(CONFIG_FILE_PATH)
+    ##
+
+    config_parser["Threading"]["enabled"] = str(is_enabled)
+    try:
+        with open(CONFIG_FILE_PATH, "w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def set_concurrent_threads(thread_count: int = 2) -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    ##
+
+    config_parser.read(CONFIG_FILE_PATH)
+    ##
+
+
+    config_parser["Threading"]["concurrent_threads"] = str(thread_count)
+   
+    try:
+        with open(CONFIG_FILE_PATH, "w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def _create_keycloak_config() -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    config_parser.read(CONFIG_FILE_PATH)
+    keycloak_config_keys = ['keycloak_url', 'client_id', 'client_secret', 'realm_name']
+    keycloak_obj = {}
+    for config_key in keycloak_config_keys:
+        keycloak_obj[config_key] =  ""
+
+    config_parser["Keycloak"] = keycloak_obj
+
+    try:
+        with CONFIG_FILE_PATH.open("w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def _create_database(db_paths: []) -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    config_parser.read(CONFIG_FILE_PATH)
+    db_obj = {}
+    for db_name, db_path in db_paths:
+        db_obj[f"{db_name}_database"] =  db_path
+
+    config_parser["General"] = db_obj
+    try:
+        with CONFIG_FILE_PATH.open("w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def _create_logfile(log_file_path: str) -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    ##
+
+    config_parser.read(CONFIG_FILE_PATH)
+    ##
+
+    config_parser["General"]["log_file_path"] = str(log_file_path)
+    try:
+        with open(CONFIG_FILE_PATH, "w") as file:
+            config_parser.write(file)
+        
+        if not os.path.isfile(log_file_path):
+            with open(log_file_path, "w") as file:
+                file.close()
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def _create_encryption_key() -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    ##
+
+    config_parser.read(CONFIG_FILE_PATH)
+    ##
+
+    config_parser["Encryption"] = dict({"key": Fernet.generate_key(), "enabled": False})
+    try:
+        with open(CONFIG_FILE_PATH, "w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def enable_encryption(is_enabled: bool = True) -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    ##
+
+    config_parser.read(CONFIG_FILE_PATH)
+    ##
+
+    config_parser["Encryption"]["enabled"] = str(is_enabled)
+    try:
+        with open(CONFIG_FILE_PATH, "w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def reset_encryption_key() -> int:
+    #--
+    config_parser = configparser.ConfigParser()
+    ##
+
+    config_parser.read(CONFIG_FILE_PATH)
+    ##
+
+
+    config_parser["Encryption"]["key"] = str(Fernet.generate_key())
+   
+    try:
+        with open(CONFIG_FILE_PATH, "w") as file:
+            config_parser.write(file)
+    except OSError:
+        return DB_WRITE_ERROR
+    return SUCCESS
+
+def getLogFilePath():
+    #--
+    config_parser = configparser.ConfigParser()
+   
+    try:
+        ##
+
+        config_parser.read(CONFIG_FILE_PATH)
+        return config_parser["General"]["log_file_path"]
+    except Exception as e:
+        return LOG_FILE_PATH
+
+def getKeycloakConfig():
+    #--
+    config_parser = configparser.ConfigParser()
+   
+    try:
+        ##
+
+        config_parser.read(CONFIG_FILE_PATH)
+        return config_parser["Keycloak"]
+    except Exception as e:
+        typer.secho(
+            f'Keycloak Config File Error : {str(e)}',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+def get_threading_config():
+    #--
+    config_parser = configparser.ConfigParser()
+   
+    try:
+        ##
+
+        config_parser.read(CONFIG_FILE_PATH)
+        return config_parser["Threading"]
+    except Exception as e:
+        typer.secho(
+            f'Threading Config File Error : {str(e)}',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)

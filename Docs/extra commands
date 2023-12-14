@@ -1,0 +1,18 @@
+cd C:\Users\User\Scraper
+.\venv\Scripts\pip install pypiwin32
+.\venv\Scripts\pywin32_postinstall.py -install
+pip install pyinstaller
+venv\Scripts\pyinstaller --hiddenimport win32timezone -F scheduler.py
+.\dist\scheduler.exe install
+.\dist\scheduler.exe start
+
+cd C:\Users\User\Scraper
+nssm.exe install SimpleScrape C:\Users\User\Scraper\dist\simple_scrape.exe
+nssm.exe start SimpleScrape
+nssm set SimpleScrape AppStderr C:\Users\User\Scraper\service-error.log
+
+nssm install MyPythonService C:\Python39\python.exe C:\path\to\nssm_service.py
+
+# for module
+nssm.exe install ProjectService "c:\path\to\python.exe" "-m app.main"
+nssm.exe set ProjectService AppDirectory "c:\path\to\project"

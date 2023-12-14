@@ -1,0 +1,221 @@
+#--
+
+import configparser
+import json
+from pysondb import PysonDB
+from pysondb import errors as pysonErrors
+import typer
+import os
+
+from autonomous_data_collection_agent import DB_READ_ERROR, DB_WRITE_ERROR, JSON_ERROR, SUCCESS, __app_name__
+
+##
+
+##
+
+ENDPOINT_DB_FILE_PATH = os.path.join(os.getcwd(), __app_name__, "database_endpoint.json")
+APP_DB_FILE_PATH = os.path.join(os.getcwd(), __app_name__, "database_application.json")
+
+
+def get_database_path(config_file: str, item_type) -> str:
+    #--
+
+    config_parser = configparser.ConfigParser()
+    config_parser.read(config_file)
+    return str(config_parser["General"][f"{item_type}_database"])
+
+
+def init_database(db_path: str) -> int:
+    #--
+    try:
+        with open(db_path, 'w') as file:
+            json.dump({
+            "version": 2,
+            "keys": [],
+            "data": {}
+        }, file)
+        return SUCCESS
+    except OSError:
+        return DB_WRITE_ERROR
+
+##
+
+##
+
+class DBResponse:
+    item_list: list[dict]
+    error: int
+    def __init__(self, item_list, error):
+        self.item_list = item_list
+        self.error = error
+
+##
+
+##
+
+class DatabaseHandler:
+    def __init__(self, db_path: str) -> None:
+        #--
+        self._db_path = db_path
+        self._db = PysonDB(self._db_path)
+    
+    def add_item(self, item: dict) -> DBResponse:
+        #--
+        try:
+            ##
+
+            return DBResponse([self._db.add(item)], SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_WRITE_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+
+    def get_by_id(self, id: int) -> DBResponse:
+        #--
+        try:
+            return DBResponse([self._db.get_by_id(id)], SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+    
+    def get_by_query(self, query_str: str) -> DBResponse:
+        #--
+        ##
+
+        try:
+            return DBResponse(self._db.get_by_query(query=query_str), SUCCESS) 
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+    
+    def get_by_column(self, column_name: str, column_value: str) -> DBResponse:
+        #--
+        ##
+
+    
+        try:
+            return  DBResponse(self._db.get_by_query(query=lambda x: x[column_name] == column_value), SUCCESS) 
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+        
+    def read_items(self) -> DBResponse:
+        #--
+        try:
+            return DBResponse(self._db.get_all(), SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+
+    def update_by_id(self, id: int, data: dict) -> DBResponse:
+        #--
+        try:
+            return DBResponse(self._db.update_by_id(str(id), data), SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+    
+    def update_by_query(self, query_str: str, data: dict) -> DBResponse:
+        #--
+         ##
+
+        try:
+            return DBResponse(self._db.update_by_query(query_str, new_data=data), SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+
+    def delete_by_id(self, id: int) -> DBResponse:
+        #--
+        try:
+            self._db.delete_by_id(id)
+            return DBResponse([], SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+    
+    def delete_by_query(self, query_str: str) -> DBResponse:
+        #--
+         ##
+
+        try:
+            return  DBResponse(self._db.delete_by_query(query_str), SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+
+    def write_items(self, item_list: list[dict]) -> DBResponse:
+        #--
+        ##
+
+        try:
+            item_list_ids = self._db.add_many(item_list, json_response= True)
+            return DBResponse(item_list_ids, SUCCESS)
+        except OSError:  ##
+
+            return DBResponse(item_list, DB_WRITE_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+    
+    def purge(self) -> DBResponse:
+        #--
+        try:
+            self._db.purge()
+            return DBResponse([], SUCCESS)
+        except OSError:  ##
+
+            return DBResponse([], DB_READ_ERROR)
+        except pysonErrors.IdDoesNotExistError as error:
+            typer.secho(
+                    f"ID Not found/mismatch Error: {error.message}", fg=typer.colors.RED
+                )
+            raise typer.Exit(1)
+
+##

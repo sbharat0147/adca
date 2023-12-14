@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>autonomous_data_collection_agent.config &#8212; Autonomous Data Collector Agent 1.0.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=039e1c02" />
+    <script src="../../_static/documentation_options.js?v=2ab8bd80"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for autonomous_data_collection_agent.config</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;This module provides to initialize and configure the Autonomous Data Collector Agent.</span>
+
+<span class="sd">:param db_paths: A list of tuples containing the names and paths of the databases to be created</span>
+<span class="sd">:type db_paths: []</span>
+<span class="sd">:return: The module provides several functions that return an integer value indicating the success</span>
+<span class="sd">or failure of the operation. The specific values returned are:</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">configparser</span>
+<span class="kn">from</span> <span class="nn">cryptography.fernet</span> <span class="kn">import</span> <span class="n">Fernet</span>
+<span class="kn">import</span> <span class="nn">typer</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="n">DB_WRITE_ERROR</span><span class="p">,</span> <span class="n">DIR_ERROR</span><span class="p">,</span> <span class="n">FILE_ERROR</span><span class="p">,</span> <span class="n">SUCCESS</span><span class="p">,</span> <span class="n">__app_name__</span>
+
+<span class="c1"># The code is creating file paths for the configuration file and log file.</span>
+<span class="n">CONFIG_DIR_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="n">__app_name__</span><span class="p">)</span>
+<span class="n">CONFIG_FILE_PATH</span> <span class="o">=</span> <span class="n">CONFIG_DIR_PATH</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="s2">&quot;config.ini&quot;</span>
+<span class="n">LOG_FILE_PATH</span> <span class="o">=</span> <span class="n">CONFIG_DIR_PATH</span>  <span class="o">+</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span>  <span class="s2">&quot;app.log&quot;</span>
+
+<div class="viewcode-block" id="init_app">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.init_app">[docs]</a>
+<span class="k">def</span> <span class="nf">init_app</span><span class="p">(</span><span class="n">db_paths</span><span class="p">:</span> <span class="p">[])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The `init_app` function initializes the application by performing various setup tasks such as</span>
+<span class="sd">    creating a configuration file, creating a database, creating a logfile, generating an encryption</span>
+<span class="sd">    key, setting up Keycloak configuration, and setting up threading configuration.</span>
+<span class="sd">    </span>
+<span class="sd">    :param db_paths: The `db_paths` parameter is a list of paths to the databases that need to be</span>
+<span class="sd">    created</span>
+<span class="sd">    :type db_paths: []</span>
+<span class="sd">    :return: an integer value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_code</span> <span class="o">=</span> <span class="n">_init_config_file</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">config_code</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">config_code</span>
+    <span class="n">database_code</span> <span class="o">=</span> <span class="n">_create_database</span><span class="p">(</span><span class="n">db_paths</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">database_code</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">database_code</span>
+
+    <span class="n">logfile_error_code</span> <span class="o">=</span> <span class="n">_create_logfile</span><span class="p">(</span><span class="n">LOG_FILE_PATH</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">logfile_error_code</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">logfile_error_code</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Logfile is successfully created at </span><span class="si">{</span><span class="n">LOG_FILE_PATH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">BRIGHT_MAGENTA</span><span class="p">)</span>
+   
+    <span class="n">encryption_error_code</span> <span class="o">=</span> <span class="n">_create_encryption_key</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">encryption_error_code</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">encryption_error_code</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Encryption key generated succesfully. &quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">YELLOW</span><span class="p">)</span>
+    
+
+    <span class="n">keycloak_error_code</span> <span class="o">=</span> <span class="n">_create_keycloak_config</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">keycloak_error_code</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">keycloak_error_code</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Keycloak config basic setup done. Please update details for realtime use.&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">BLUE</span><span class="p">)</span>
+
+    
+    <span class="n">threading_error_code</span> <span class="o">=</span> <span class="n">_create_threading_config</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">threading_error_code</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">threading_error_code</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Threading config basic setup done. Please update details for realtime use.&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">BRIGHT_CYAN</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">SUCCESS</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_init_config_file</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function initializes a configuration file by creating a directory and a file, and returns a</span>
+<span class="sd">    success code if successful.</span>
+<span class="sd">    :return: an integer value. The possible return values are:</span>
+<span class="sd">    - `SUCCESS` if the configuration directory and file were successfully created or already exist.</span>
+<span class="sd">    - `DIR_ERROR` if there was an error creating the configuration directory.</span>
+<span class="sd">    - `FILE_ERROR` if there was an error creating the configuration file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">CONFIG_DIR_PATH</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DIR_ERROR</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">CONFIG_FILE_PATH</span><span class="o">.</span><span class="n">touch</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FILE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span>
+
+<span class="k">def</span> <span class="nf">_create_threading_config</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `_create_threading_config()` creates a threading configuration file with enabled</span>
+<span class="sd">    threading and a specified number of concurrent threads.</span>
+<span class="sd">    :return: an integer value. If the write operation to the config file is successful, it will return</span>
+<span class="sd">    the value of the constant `SUCCESS`. If there is an error while writing to the file, it will return</span>
+<span class="sd">    the value of the constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Threading&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;concurrent_threads&quot;</span><span class="p">:</span> <span class="mi">2</span> <span class="p">}</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">CONFIG_FILE_PATH</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span>
+
+<div class="viewcode-block" id="enable_threading">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.enable_threading">[docs]</a>
+<span class="k">def</span> <span class="nf">enable_threading</span><span class="p">(</span><span class="n">is_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function enables or disables threading by updating a configuration file.</span>
+<span class="sd">    </span>
+<span class="sd">    :param is_enabled: A boolean value indicating whether threading should be enabled or not, defaults</span>
+<span class="sd">    to True</span>
+<span class="sd">    :type is_enabled: bool (optional)</span>
+<span class="sd">    :return: an integer value. If the write operation to the configuration file is successful, it will</span>
+<span class="sd">    return the value of the constant `SUCCESS`. If there is an error while writing to the file, it will</span>
+<span class="sd">    return the value of the constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="c1"># Read the existing file first</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="c1"># Add the new section</span>
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Threading&quot;</span><span class="p">][</span><span class="s2">&quot;enabled&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">is_enabled</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span></div>
+
+
+<div class="viewcode-block" id="set_concurrent_threads">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.set_concurrent_threads">[docs]</a>
+<span class="k">def</span> <span class="nf">set_concurrent_threads</span><span class="p">(</span><span class="n">thread_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function sets the number of concurrent threads in a configuration file.</span>
+<span class="sd">    </span>
+<span class="sd">    :param thread_count: The `thread_count` parameter is an integer that represents the number of</span>
+<span class="sd">    concurrent threads you want to set, defaults to 2</span>
+<span class="sd">    :type thread_count: int (optional)</span>
+<span class="sd">    :return: an integer value. If the file write operation is successful, it will return the value of</span>
+<span class="sd">    the constant `SUCCESS`. If there is an error while writing to the file, it will return the value of</span>
+<span class="sd">    the constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="c1"># Read the existing file first</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="c1"># Add the new section</span>
+
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Threading&quot;</span><span class="p">][</span><span class="s2">&quot;concurrent_threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">thread_count</span><span class="p">)</span>
+   
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span></div>
+
+
+<span class="k">def</span> <span class="nf">_create_keycloak_config</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `_create_keycloak_config()` creates a Keycloak configuration file with default values.</span>
+<span class="sd">    :return: an integer value. If the writing of the configuration file is successful, it will return</span>
+<span class="sd">    the value of the constant `SUCCESS`. If there is an error while writing the file, it will return the</span>
+<span class="sd">    value of the constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="n">keycloak_config_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;keycloak_url&#39;</span><span class="p">,</span> <span class="s1">&#39;client_id&#39;</span><span class="p">,</span> <span class="s1">&#39;client_secret&#39;</span><span class="p">,</span> <span class="s1">&#39;realm_name&#39;</span><span class="p">]</span>
+    <span class="n">keycloak_obj</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">config_key</span> <span class="ow">in</span> <span class="n">keycloak_config_keys</span><span class="p">:</span>
+        <span class="n">keycloak_obj</span><span class="p">[</span><span class="n">config_key</span><span class="p">]</span> <span class="o">=</span>  <span class="s2">&quot;&quot;</span>
+
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Keycloak&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">keycloak_obj</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">CONFIG_FILE_PATH</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span>
+
+<span class="k">def</span> <span class="nf">_create_database</span><span class="p">(</span><span class="n">db_paths</span><span class="p">:</span> <span class="p">[])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `_create_database` creates a database configuration file with the provided database</span>
+<span class="sd">    paths.</span>
+<span class="sd">    </span>
+<span class="sd">    :param db_paths: The `db_paths` parameter is a list of tuples. Each tuple contains two elements: the</span>
+<span class="sd">    `db_name` and the `db_path`. The `db_name` is a string representing the name of the database, and</span>
+<span class="sd">    the `db_path` is a string representing the path to the database file</span>
+<span class="sd">    :type db_paths: []</span>
+<span class="sd">    :return: an integer value. If the writing of the database configuration file is successful, it will</span>
+<span class="sd">    return the value of the constant `SUCCESS`. If there is an error while writing the file, it will</span>
+<span class="sd">    return the value of the constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="n">db_obj</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">db_name</span><span class="p">,</span> <span class="n">db_path</span> <span class="ow">in</span> <span class="n">db_paths</span><span class="p">:</span>
+        <span class="n">db_obj</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">db_name</span><span class="si">}</span><span class="s2">_database&quot;</span><span class="p">]</span> <span class="o">=</span>  <span class="n">db_path</span>
+
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;General&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">db_obj</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">CONFIG_FILE_PATH</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span>
+
+<span class="k">def</span> <span class="nf">_create_logfile</span><span class="p">(</span><span class="n">log_file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `_create_logfile` creates a log file path in a configuration file and creates an empty</span>
+<span class="sd">    log file if it doesn&#39;t exist.</span>
+<span class="sd">    </span>
+<span class="sd">    :param log_file_path: The `log_file_path` parameter is a string that represents the path where the</span>
+<span class="sd">    log file will be created</span>
+<span class="sd">    :type log_file_path: str</span>
+<span class="sd">    :return: an integer value. If the file write operations are successful, it returns the value of the</span>
+<span class="sd">    constant `SUCCESS`. If there is an error while writing to the file, it returns the value of the</span>
+<span class="sd">    constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="c1"># Read the existing file first</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="c1"># Add the new section</span>
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;General&quot;</span><span class="p">][</span><span class="s2">&quot;log_file_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">log_file_path</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">log_file_path</span><span class="p">):</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">log_file_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span>
+
+<span class="k">def</span> <span class="nf">_create_encryption_key</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function creates an encryption key and writes it to a configuration file.</span>
+<span class="sd">    :return: an integer value. If the file write operation is successful, it returns the value of the</span>
+<span class="sd">    constant `SUCCESS`. If there is an error while writing the file, it returns the value of the</span>
+<span class="sd">    constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="c1"># Read the existing file first</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="c1"># Add the new section</span>
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Encryption&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">({</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="n">Fernet</span><span class="o">.</span><span class="n">generate_key</span><span class="p">(),</span> <span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span>
+
+<div class="viewcode-block" id="enable_encryption">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.enable_encryption">[docs]</a>
+<span class="k">def</span> <span class="nf">enable_encryption</span><span class="p">(</span><span class="n">is_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function enables encryption by updating the configuration file with the specified encryption</span>
+<span class="sd">    status.</span>
+<span class="sd">    </span>
+<span class="sd">    :param is_enabled: A boolean value indicating whether encryption should be enabled or not, defaults</span>
+<span class="sd">    to True</span>
+<span class="sd">    :type is_enabled: bool (optional)</span>
+<span class="sd">    :return: an integer value. If the file write operation is successful, it will return the value of</span>
+<span class="sd">    the constant `SUCCESS`. If there is an error while writing to the file, it will return the value of</span>
+<span class="sd">    the constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="c1"># Read the existing file first</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="c1"># Add the new section</span>
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Encryption&quot;</span><span class="p">][</span><span class="s2">&quot;enabled&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">is_enabled</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span></div>
+
+
+<div class="viewcode-block" id="reset_encryption_key">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.reset_encryption_key">[docs]</a>
+<span class="k">def</span> <span class="nf">reset_encryption_key</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `reset_encryption_key` generates a new encryption key and updates it in a configuration</span>
+<span class="sd">    file.</span>
+<span class="sd">    :return: an integer value. If the file write operation is successful, it returns the value of the</span>
+<span class="sd">    constant `SUCCESS`. If there is an error while writing to the file, it returns the value of the</span>
+<span class="sd">    constant `DB_WRITE_ERROR`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="c1"># Read the existing file first</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+    <span class="c1"># Add the new section</span>
+
+    <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Encryption&quot;</span><span class="p">][</span><span class="s2">&quot;key&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Fernet</span><span class="o">.</span><span class="n">generate_key</span><span class="p">())</span>
+   
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">config_parser</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span>
+    <span class="k">return</span> <span class="n">SUCCESS</span></div>
+
+
+<div class="viewcode-block" id="getLogFilePath">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.getLogFilePath">[docs]</a>
+<span class="k">def</span> <span class="nf">getLogFilePath</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `getLogFilePath` returns the log file path from a configuration file, or a default log</span>
+<span class="sd">    file path if the configuration file is not found or an error occurs.</span>
+<span class="sd">    :return: the value of the &quot;log_file_path&quot; key from the &quot;General&quot; section of the configuration file</span>
+<span class="sd">    if it exists. If there is an exception or the key does not exist, it will return the value of the</span>
+<span class="sd">    LOG_FILE_PATH variable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+   
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Read the existing file first</span>
+        <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;General&quot;</span><span class="p">][</span><span class="s2">&quot;log_file_path&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">LOG_FILE_PATH</span></div>
+
+
+<div class="viewcode-block" id="getKeycloakConfig">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.getKeycloakConfig">[docs]</a>
+<span class="k">def</span> <span class="nf">getKeycloakConfig</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The above function reads a Keycloak configuration file using configparser and returns the Keycloak</span>
+<span class="sd">    section of the configuration.</span>
+<span class="sd">    :return: The function `getKeycloakConfig()` returns the configuration values for Keycloak from a</span>
+<span class="sd">    config file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+   
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Read the existing file first</span>
+        <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Keycloak&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Keycloak Config File Error : </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_threading_config">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.config.get_threading_config">[docs]</a>
+<span class="k">def</span> <span class="nf">get_threading_config</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `get_threading_config()` reads a threading configuration file and returns the</span>
+<span class="sd">    configuration settings.</span>
+<span class="sd">    :return: The function `get_threading_config()` returns the configuration settings for threading from</span>
+<span class="sd">    a config file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+   
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Read the existing file first</span>
+        <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">CONFIG_FILE_PATH</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;Threading&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Threading Config File Error : </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Autonomous Data Collector Agent</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.html">autonomous_data_collection_agent package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.tests.html">autonomous_data_collection_agent.tests package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Sgt Jai Singh.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

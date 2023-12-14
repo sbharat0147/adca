@@ -1,0 +1,29 @@
+Let's break down the functions and features of `raw_api.py` based on the provided code:
+
+1. **Dummy Data for Testing:**
+   - `dummy_data`: A list of dictionaries representing dummy data for testing.
+
+2. **Data Generation Functions:**
+   - `generate_random_data()`: Returns a randomly chosen dictionary from the `dummy_data`.
+   - `get_fake_timestamp()`: Returns a fake timestamp in the format "%d-%m-%Y %H:%M:%S".
+
+3. **Custom API Request Handler:**
+   - `FakeAPIRequestHandler`: Subclass of `http.server.BaseHTTPRequestHandler` for handling HTTP requests.
+   - Defines `_send_response` method to send an HTTP response with a specified status code and data.
+   - Defines `do_POST` method to handle HTTP POST requests:
+      - Reads and parses the incoming JSON data.
+      - Generates a fake response containing data, timestamp, and metadata based on the received request.
+      - Sends the fake response using the `_send_response` method.
+   - Defines `do_GET` method to handle HTTP GET requests:
+      - Sends a 404 Not Found response.
+
+4. **Fake API Server Setup:**
+   - `run_fake_api()`: Sets up a TCP server on localhost at port 1006 using `socketserver.TCPServer` with `FakeAPIRequestHandler`.
+   - Prints a message indicating that the Fake API server is running.
+   - Calls `httpd.serve_forever()` to run the server indefinitely.
+
+5. **Conditional Execution:**
+   - The script includes an `if __name__ == '__main__':` block, which is currently commented out.
+   - When uncommented, it runs the `run_fake_api()` function.
+
+In summary, `raw_api.py` is a script that defines a simple fake API server using the Python `http.server` module. It includes functions to generate random data and fake timestamps, a custom API request handler to handle POST and GET requests, and a setup for a TCP server to run the fake API. The script is currently set to run the fake API server on port 1006 when executed directly.

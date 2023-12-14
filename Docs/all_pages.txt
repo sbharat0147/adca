@@ -1,0 +1,742 @@
+We have an python based application named Autonomous data collection agent. It is designed to collect data from various applications using endpoints on a predefined frequency. It dynamically builds and sends requests with ability to define filters, attributes, order, pagination etc for each endpoints separately. It also handles authentication of API dynamically including KeyCloak integration. It also has scheduler service which runs in background to keep runt he apis. The documentation from the various files is given below. Please understand and make a detailed document describing the application, features and functionalities.
+
+# Autonomous Data Collection Agent Documentation
+
+## Overview
+
+The `autonomousagent.py` module serves as the controller for the Autonomous Data Collector Agent. It provides functionality for managing and manipulating both applications and endpoints in a database.
+
+## Classes
+
+### 1. `CurrentEndpoint`
+
+Represents an endpoint with its associated error code. The structure of the endpoint object is as follows:
+
+```python
+endpoint: {
+    id: int,
+    app_id: str,
+    name: str,
+    url_endpoint: str,
+    method: (GET | POST),
+    payload: {table_name: str, ...},
+    filters: [{
+        column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),
+        operator: (> | < | = | >= | <= | != | <> ),
+        column_value: DD-MM-YYYY hh:mm:ss
+    }],
+    page_size: int,
+    last_sync: date_time,
+    process_status: 0 | 1 | 2,
+    failed_count: int,
+    failed_time: DD-MM-YYYY hh:mm:ss,
+    status: 0 | 1
+}
+```
+
+### 2. `CurrentApplication`
+
+Represents a current application with its attributes `application` and `error`. The structure of the application object is as follows:
+
+```python
+application: {
+    id: int,
+    name: str,
+    short_name: str,
+    host: str,
+    url_scheme: str (http | https),
+    auth_type: str (None | KEYCLOAK | BASIC),
+    auth_data: {},
+    dump_path: str,
+    sync_frequency: str (cronjob),
+    last_sync: date_time,
+    next_sync: date_time,
+    default_payload: {},
+    default_filters: [{
+        column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),
+        operator: (> | < | = | >= | <= | != | <> ),
+        column_value: DD-MM-YYYY hh:mm:ss
+    }],
+    default_page_size: int,
+    process_status: 0 | 1 | 2,
+    status: int
+}
+```
+
+### 3. `Endpoints`
+
+Provides methods for managing and manipulating endpoint data in a database.
+
+## Functions
+
+### For Endpoints
+
+1. `__init__(db_path: str)`
+
+   Initializes an instance of the class with a database handler object.
+
+2. `validate_endpoint_data(data: dict) -> bool`
+
+   Validates the data dictionary for a specific endpoint, ensuring that the values are of the correct types.
+
+3. `add_endpoint(name: str, app_short_name: str, url_endpoint: str, method: str, payload: dict, filters: list[dict], page_size: int, last_sync: datetime, process_status: int, status: int) -> CurrentEndpoint`
+
+   Adds a new endpoint to the database with the provided parameters.
+
+4. `get_endpoint_list() -> list[dict]`
+
+   Returns the current endpoint list by reading items from the database handler.
+
+5. `get_endpoint_by_id(ENDPOINT_ID: str) -> CurrentEndpoint`
+
+   Returns the endpoint with the specified ID.
+
+6. `get_endpoint_by_name(name: str) -> CurrentEndpoint`
+
+   Returns the endpoint with a given name.
+
+7. `get_app_endpoint_by_name(app_id: str, name: str) -> CurrentEndpoint`
+
+   Returns the endpoint with a specific name for a given app ID.
+
+8. `get_endpoint_by_url(url_endpoint: str) -> CurrentEndpoint`
+
+   Returns the endpoint by name based on the provided URL endpoint.
+
+9. `get_endpoints_by_query(query: str) -> list[dict]`
+
+   Returns a list of endpoints filtered by a custom query.
+
+10. `get_app_endpoints(app_short_name: str) -> list[dict]`
+
+    Returns the current endpoint list for a given application short name.
+
+11. `get_app_endpoints_by_process_status(app_short_name: str, process_status: int) -> list[dict]`
+
+    Returns the current endpoint list for a given application filtered by process status.
+
+12. `get_app_endpoints_by_status(app_short_name: str, status: int) -> list[dict]`
+
+    Returns the current endpoint list for an application filtered by status.
+
+13. `update_endpoint(ENDPOINT_ID: int, data: dict) -> CurrentEndpoint`
+
+    Updates an endpoint with the provided data and returns the updated endpoint along with any errors encountered.
+
+14. `update_endpoint_status(ENDPOINT_ID: int, status: int) -> CurrentEndpoint`
+
+    Updates the status of an endpoint in a database and returns the updated endpoint along with any error that occurred during the update.
+
+15. `update_endpoint_process_status(ENDPOINT_ID: int, process_status: int) -> CurrentEndpoint`
+
+    Updates the process status of an endpoint in a database.
+
+16. `update_endpoints_by_query(query_str: str, data: dict) -> list[dict]`
+
+    Updates endpoints based on a query string and returns the updated endpoints.
+
+17. `remove_endpoint(ENDPOINT_ID: int) -> CurrentEndpoint`
+
+    Removes an endpoint from the database using its id or index and returns the result.
+
+18. `remove_all_endpoints() -> CurrentEndpoint`
+
+    Removes all endpoints from the database.
+
+19. `remove_all_endpoints_by_app(app_short_name: str) -> CurrentEndpoint`
+
+    Removes all endpoints of a specific application from the database.
+
+### For Applications
+
+1. `__init__(db_path: str)`
+
+   Initializes an instance of the class with a database handler object.
+
+2. `is_valid_cronjob(sync_frequency: str) -> Union[str, None]`
+
+   Checks if a given sync frequency string matches the format of a cron job.
+
+3. `check_and_create_directory(path: str) -> Union[str, None]`
+
+   Checks if a directory exists and creates it if it doesn’t.
+
+4. `validate_app_data(data: dict) -> bool`
+
+   Validates the data dictionary for a specific set of keys and their corresponding value types.
+
+5. `add_application(name: str, short_name: str, host: str, url_scheme: str, auth_type: str, auth_data: dict, dump_path: str, sync_frequency: str, last_sync: datetime, next_sync: datetime, default_payload: dict, default_filters: list[dict], default_page_size: int, process_status: int, status: int) -> CurrentApplication`
+
+   Adds a new application to the database with various parameters and performs validation checks.
+
+6. `get_applications() -> list[dict]`
+
+   Returns the current application list.
+
+7. `get_app_by_id(APP_ID: str) -> CurrentApplication`
+
+   Returns the endpoint of an application based on its ID.
+
+8. `get_app_by_name(name: str) -> CurrentApplication`
+
+   Returns the current application by name.
+
+9. `get_app_by_short_name(short_name: str) -> CurrentApplication`
+
+   Returns the current application based on its short name.
+
+10. `get_apps_by_status(status: int) -> list[dict]`
+
+    Returns a list of application dictionaries filtered by a given status.
+
+11. `get_apps_by_query(query: str) -> list[dict]`
+
+    Returns a filtered list of applications based on a custom query.
+
+12. `update_application(APP_ID: int, data: dict) -> CurrentApplication`
+
+    Updates an application with the provided data and returns the updated application along with any errors encountered.
+
+13. `
+
+update_app_status(APP_ID: int, status: int) -> CurrentApplication`
+
+    Updates the status of an application based on the provided status value.
+
+14. `update_app_process_status(APP_ID: int, process_status: int) -> CurrentApplication`
+
+    Updates the process status of an application in a database.
+
+15. `update_apps_by_query(query_str: str, data: dict) -> list[dict]`
+
+    Updates applications based on a query string and returns a list of updated items.
+
+16. `delete_apps_by_query(query_str: str) -> list[dict]`
+
+    Deletes applications based on a query string and returns the list of deleted items.
+
+17. `remove_application(APP_ID: int) -> CurrentApplication`
+
+    Removes an application from the database using its id or index.
+
+18. `remove_all_applications() -> CurrentApplication`
+
+    Removes all applications from the database.
+
+19. `get_application_id_by_name(app_short_name: str) -> str`
+
+    Retrieves the application ID based on the given application short name.
+
+20. `get_endpoint_id_by_name(endpoint_name: str) -> int`
+
+    Retrieves the ID of an endpoint by its name from the database.
+
+## Conclusion
+
+The `autonomousagent.py` module provides comprehensive functionality for managing both applications and endpoints in a database. Users can easily add, retrieve, update, and delete applications and endpoints, making it a powerful tool for autonomous data collection.
+
+Here's a breakdown of the functionality and features of `database.py` based on the provided code comments:
+
+1. **Initialization and Configuration:**
+   - The module provides functionality related to the Autonomous Data Collector Agent's database.
+   - File paths are created for two JSON database files: `database_endpoint.json` and `database_application.json`.
+
+2. **Database Path Retrieval:**
+   - `get_database_path`: Returns the current path to the database based on the provided config file and item type.
+
+3. **Database Initialization:**
+   - `init_database`: Creates a new database by writing an empty JSON object to a specified file path.
+
+4. **Response Handling:**
+   - `DBResponse` class represents a response from a database query, containing a list of items and an error code.
+
+5. **Database Interaction:**
+   - `DatabaseHandler` class provides methods for interacting with a database, including adding, retrieving, updating, and deleting items.
+   - `__init__`: Initializes an instance of the class with a given database path.
+   - `add_item`: Adds an item to a database and returns the ID of the added item.
+   - `get_by_id`: Retrieves a record from a database based on its ID.
+   - `get_by_query`: Retrieves data from a database based on a query string.
+   - `get_by_column`: Retrieves data from a database based on a specified column name and value.
+   - `read_items`: Reads items from a database and returns a response object.
+   - `update_by_id`: Updates a record in a database by its ID.
+   - `update_by_query`: Updates data in a database based on a query string.
+   - `delete_by_id`: Deletes a record from the database based on the given ID.
+   - `delete_by_query`: Deletes records from a database based on a given query string.
+   - `write_items`: Writes a list of items to a database.
+
+6. **Database Purging:**
+   - `purge`: Purges the database and returns a `DBResponse` object with an empty list and a success status or an error status.
+
+7. **Examples and Usage:**
+   - The code includes examples of query strings for various operations, such as `lambda x: x['name'] == 'abi'` or `lambda x: x['knows_python'] is False`.
+   - There's an example test query `test = '[{"column_name":"created_at", "operator":"<", "column_value":"15-03-1988 10:58:15"}]'`.
+
+8. **Command-Line Usage:**
+   - The code includes a command-line usage example `python -m autonomous_data_collection_agent update-app 331280544566123098 -df "[{"column_name":"CREATED_AT","operator":"=","column_value":"15-03-1988 10:58:15"},{"column_name":"UPDATED_AT","operator":"=", "column_value":"15-03-1988 10:58:15"}]"`.
+
+In summary, `database.py` is a module that provides functionality for database interactions, including initialization, CRUD operations, and database purging, with examples and usage scenarios provided in the comments.
+
+Let's break down the functionality and features of `fileencryption.py` based on the provided code comments:
+
+1. **Initialization and Configuration:**
+   - `FileEncryption` class provides methods for encrypting and decrypting files using the Fernet encryption algorithm.
+   - The function initializes a class instance by reading a configuration file and setting encryption key and encryption-enabled properties.
+
+2. **Encryption Status Checking:**
+   - `is_encryption_enabled`: Checks if encryption is enabled by comparing the value of the `_encryption_enabled` attribute to the string "True".
+   - `is_encryption_enabled_v2`: Checks if encryption is enabled by verifying the availability of an encryption key.
+
+3. **File Encryption:**
+   - `encrypt_and_save_content`: Encrypts the given file content using a provided encryption key and saves it to the specified file path.
+     - Parameters: `file_content` (content to encrypt), `file_path` (destination file path).
+     - Returns: the file path where the encrypted content is saved.
+
+   - `encrypt_original_file`: Encrypts a file using the Fernet encryption algorithm and saves the encrypted data back to the original file.
+     - Parameters: `file_path` (path to the file to encrypt).
+     - Returns: the file path of the encrypted file.
+
+   - `encrypt_file`: Encrypts the contents of the source file using a provided encryption key and writes the encrypted data to the destination file.
+     - Parameters: `source_file_path` (path to the source file), `destination_file_path` (path where the encrypted file will be saved).
+     - Returns: the destination file path.
+
+4. **File Decryption:**
+   - `decrypt_and_save_content`: Decrypts the file content using a provided encryption key and saves the decrypted content to the specified file path.
+     - Parameters: `file_content` (content to decrypt), `file_path` (destination file path).
+     - Returns: the file path where the decrypted content is saved.
+
+   - `decrypt_original_file`: Decrypts a file using the Fernet encryption algorithm and overwrites the original file with the decrypted data.
+     - Parameters: `file_path` (path to the file to decrypt).
+     - Returns: the file path of the decrypted file.
+
+   - `decrypt_file`: Decrypts the source file and writes the decrypted data to the destination file if encryption is enabled.
+     - Parameters: `source_file_path` (path to the source file), `destination_file_path` (path where the decrypted file will be saved).
+     - Returns: the destination file path.
+
+5. **Examples and Usage:**
+   - The code includes examples of encrypting and decrypting files, opening files in write mode, and writing encrypted or decrypted data.
+
+In summary, `fileencryption.py` provides a class for file encryption and decryption using the Fernet encryption algorithm, with methods for checking encryption status, encrypting and decrypting file content, and performing these operations on files.
+
+Let's outline the functionality and features of `keycloak_auth.py` based on the provided code comments:
+
+1. **Initialization and Configuration:**
+   - `KeycloakAuth` class is used to authenticate and obtain an access token from a Keycloak server.
+   - The function `__init__` initializes the class instance with authentication data, either from the provided argument or from the class configuration.
+     - Parameters: `auth_data` (a dictionary containing authentication data such as Keycloak URL, client ID, client secret, and realm name). It is an optional parameter.
+
+2. **Setting Authentication Data:**
+   - The function `set_auth_data` sets authentication data for a Keycloak client.
+     - Parameters: `auth_data` (a dictionary containing keys like Keycloak URL, client ID, client secret, and realm name).
+
+3. **Token Retrieval:**
+   - The function `get_token` sends a request to Keycloak to obtain an access token using client credentials.
+     - Returns: the access token from the response JSON.
+
+In summary, `keycloak_auth.py` provides a class `KeycloakAuth` for handling authentication with a Keycloak server. It allows the initialization of the class instance with authentication data and provides a method to obtain an access token from Keycloak using client credentials. This is useful for authenticating and authorizing requests to Keycloak-protected resources.
+
+# Autonomous Data Collector Agent CLI Documentation
+
+## Overview
+
+The `cli.py` module provides the command-line interface (CLI) for the Autonomous Data Collector Agent. It allows users to interact with the agent, perform various operations, and manage applications and endpoints.
+
+## Module Structure
+
+### Importing Modules
+
+The module starts by importing various modules and classes from the `autonomous_data_collection_agent` package and other Python standard libraries. It also includes the `Enum` class from the `enum` module.
+
+### Logging Configuration
+
+The code configures the logging module in Python. It sets the log file path, file mode, log message format, date format, and log level to DEBUG.
+
+### Typer Initialization
+
+The module defines a Python application using the `Typer` library. The `Typer()` function creates an instance of the `Typer` class, which is used to define command-line interfaces (CLIs) in Python.
+
+### Initialization Function
+
+The `init` function initializes the databases by creating a config file and initializing the endpoint and app databases. It takes `endpoint_db_path` and `app_db_path` parameters to specify the location of the databases.
+
+## CLI Commands and Functions
+
+### 1. Enabling/Disabling Threading
+
+- **Function:** `enable_threading`
+- **Description:** Enables or disables threading for concurrent file downloads and logs the status.
+- **Parameters:**
+  - `is_enabled`: String representing whether threading should be enabled or disabled.
+
+### 2. Setting Concurrent Threads
+
+- **Function:** `set_concurrent_threads`
+- **Description:** Sets the number of concurrent threads based on the CPU count and prompts the user for confirmation.
+- **Parameters:**
+  - `thread_count`: Integer representing the number of threads.
+  - `force`: Boolean option to force the change without confirmation.
+
+### 3. Enabling/Disabling Encryption
+
+- **Function:** `enable_encryption`
+- **Description:** Enables or disables file encryption based on the value of the `is_enabled` parameter.
+- **Parameters:**
+  - `is_enabled`: Boolean flag indicating whether file encryption should be enabled.
+
+### 4. Resetting Encryption Key
+
+- **Function:** `reset_encryption_key`
+- **Description:** Prompts the user to confirm resetting the encryption key and resets it if confirmed.
+
+### 5. Checking Encryption Status
+
+- **Function:** `check_encryption`
+- **Description:** Checks if encryption is enabled and provides a message accordingly.
+
+### 6. Getting Endpoints and Applications
+
+- **Function:** `get_endpoints`
+- **Description:** Returns an instance of the `Endpoints` class for performing operations on data.
+
+- **Function:** `get_applications`
+- **Description:** Returns an instance of the `Applications` class for operating on data.
+
+### 7. Validating Datetime Format
+
+- **Function:** `validate_datetime`
+- **Description:** Validates if a given datetime string is in the format ‘DD-MM-YYYY hh:mm:ss’.
+- **Parameters:**
+  - `datetime_str`: String representing a date and time.
+
+### 8. Adding an Endpoint
+
+- **Function:** `add_endpoint`
+- **Description:** Adds a new endpoint with various details.
+- **Parameters:**
+  - Multiple parameters including `name`, `app_short_name`, `url_endpoint`, `method`, `payload`, `filters`, `page_size`, `last_sync`, `process_status`, and `status`.
+
+- **Example Usage:** `python your_script.py add_endpoint --name "Example Endpoint" --app-name "AOS" --endpoint "example-api-endpoint" --method POST --payload '{"key1": "value1", "key2": "value2"}' --filters '[{"column_name": "name", "operator": "value", "column_value": "value"}]' --page-size 500 --last-sync "13-10-2023 14:30:00" --process-status 0 --status 1`
+
+### 9. Listing Endpoints
+
+- **Function:** `list_endpoints`
+- **Description:** Lists all endpoints.
+
+- **Function:** `list_app_endpoints`
+- **Description:** Lists all endpoints for a given application.
+- **Parameters:**
+  - `app_short_name`: Short name of the application.
+
+### 10. Retrieving Endpoint Information
+
+- **Function:** `get_endpoint`
+- **Description:** Retrieves an endpoint using its ID and displays the result.
+- **Parameters:**
+  - `endpoint_id`: ID of the endpoint.
+
+- **Function:** `get_endpoint_by_name`
+- **Description:** Retrieves an endpoint using its name and displays the result.
+- **Parameters:**
+  - `endpoint_name`: Name of the endpoint.
+
+- **Function:** `get_endpoint_by_url`
+- **Description:** Retrieves an endpoint using its URL and displays the result.
+- **Parameters:**
+  - `url_endpoint`: URL of the endpoint.
+
+### 11. Updating Endpoint Information
+
+- **Function:** `update_endpoint`
+- **Description:** Updates an existing endpoint with new details based on provided arguments.
+- **Parameters:**
+  - Multiple parameters including `endpoint_id`, `name`, `app_short_name`, `url_endpoint`, `method`, `payload`, `filters`, `page_size`, `last_sync`, `process_status`, and `status`.
+  
+- **Example Usage:** `python your_script.py update_endpoint --id "231541323453553701" --name "Updated Name" --app-name "Updated App" --method POST --status 0`
+
+- **Function:** `update_endpoint_process_status`
+- **Description:** Updates the process status of an existing endpoint.
+- **Parameters:**
+  - `endpoint_id`: ID of the endpoint.
+  - `process_status`: New process status.
+
+- **Example Usage:** `python your_script.py update_process_endpoint --id "231541323453553701" --process-status 1`
+
+### 12. Removing Endpoints
+
+- **Function:** `remove_endpoint`
+- **Description:** Removes an endpoint using its endpoint ID, with an option to force deletion without confirmation.
+- **Parameters:**
+  - `endpoint_id`: ID of the endpoint.
+  - `force`: Boolean option to force deletion without confirmation.
+
+- **Function:** `remove_app_endpoints`
+- **Description:** Removes endpoints associated with a given application short name, with an option to force deletion without confirmation.
+- **Parameters:**
+  - `app_short_name`: Short name of the application.
+  - `force`: Boolean flag indicating whether to force deletion without confirmation.
+
+- **Function:** `remove_all_endpoints`
+- **Description:** Removes all endpoints, with an option to force deletion without confirmation.
+- **Parameters:**
+  - `force`: Boolean flag determining whether to delete all endpoints without confirmation.
+
+### 13. Enumeration Classes
+
+- **Class:** `HttpMethod`
+  - **Description:** Restricts methods to GET, POST, and None using named tuple types.
+
+- **Class:** `UrlSchemes`
+  - **Description:** Enumeration representing different URL schemes such as “http” and “https”.
+
+- **Class:** `AuthTypes`
+  - **Description:** Enumeration representing different types of authentication.
+
+### 14. Managing Applications
+
+- **Function:** `add_application`
+- **Description:** Adds a new application with the provided details.
+- **Parameters:**
+  - Multiple parameters including `name`, `short_name`, `host`, `url_scheme`, `auth_type`, `
+
+auth_token`, `auth_username`, and `auth_password`.
+
+- **Example Usage:** `python your_script.py add_application --name "New App" --short-name "NA" --host "example.com" --url-scheme "https" --auth-type "Basic" --auth-username "user" --auth-password "pass"`
+
+- **Function:** `list_applications`
+- **Description:** Lists all applications.
+
+- **Function:** `get_application`
+- **Description:** Retrieves application details using the short name and displays the result.
+- **Parameters:**
+  - `app_short_name`: Short name of the application.
+
+- **Function:** `update_application`
+- **Description:** Updates an existing application with new details based on provided arguments.
+- **Parameters:**
+  - Multiple parameters including `short_name`, `name`, `host`, `url_scheme`, `auth_type`, `auth_token`, `auth_username`, and `auth_password`.
+
+- **Example Usage:** `python your_script.py update_application --short-name "NA" --name "Updated App" --host "new-example.com" --auth-username "new_user"`
+
+- **Function:** `remove_application`
+- **Description:** Removes an application using its short name, with an option to force deletion without confirmation.
+- **Parameters:**
+  - `app_short_name`: Short name of the application.
+  - `force`: Boolean flag indicating whether to force deletion without confirmation.
+
+- **Function:** `remove_all_applications`
+- **Description:** Removes all applications, with an option to force deletion without confirmation.
+- **Parameters:**
+  - `force`: Boolean flag determining whether to delete all applications without confirmation.
+
+### 15. CLI Entry Point
+
+The module defines the main entry point for the CLI using the `if __name__ == "__main__":` block. It calls the `cli()` function to run the CLI.
+
+## Running the CLI
+
+To run the Autonomous Data Collector Agent CLI, execute the `cli.py` script using the Python interpreter. The CLI supports various commands and options for managing endpoints, applications, and other settings.
+
+### Example Usage:
+
+#### Enabling Threading:
+```bash
+python cli.py enable_threading --is-enabled true
+```
+
+#### Setting Concurrent Threads:
+```bash
+python cli.py set_concurrent_threads --thread-count 4
+```
+
+#### Adding an Endpoint:
+```bash
+python cli.py add_endpoint --name "Example Endpoint" --app-name "AOS" --endpoint "example-api-endpoint" --method POST --payload '{"key1": "value1", "key2": "value2"}' --filters '[{"column_name": "name", "operator": "value", "column_value": "value"}]' --page-size 500 --last-sync "13-10-2023 14:30:00" --process-status 0 --status 1'
+```
+
+#### Listing Endpoints:
+```bash
+python cli.py list_endpoints
+```
+
+#### Retrieving Endpoint Information:
+```bash
+python cli.py get_endpoint --endpoint-id 123456789
+```
+
+#### Updating Endpoint Information:
+```bash
+python cli.py update_endpoint --endpoint-id 123456789 --name "Updated Endpoint" --app-name "Updated App" --method PUT --payload '{"updated_key": "updated_value"}' --last-sync "14-10-2023 15:45:00" --process-status 1 --status 0'
+```
+
+#### Removing Endpoint:
+```bash
+python cli.py remove_endpoint --endpoint-id 123456789
+```
+
+#### Adding an Application:
+```bash
+python cli.py add_application --name "New App" --short-name "NA" --host "new-example.com" --url-scheme "https" --auth-type "Basic" --auth-username "new_user" --auth-password "new_pass"
+```
+
+#### Listing Applications:
+```bash
+python cli.py list_applications
+```
+
+#### Retrieving Application Information:
+```bash
+python cli.py get_application --app-short-name "NA"
+```
+
+#### Updating Application Information:
+```bash
+python cli.py update_application --short-name "NA" --name "Updated App" --host "updated-example.com" --auth-username "updated_user"
+```
+
+#### Removing Application:
+```bash
+python cli.py remove_application --app-short-name "NA"
+```
+
+#### Enabling Encryption:
+```bash
+python cli.py enable_encryption --is-enabled true
+```
+
+#### Resetting Encryption Key:
+```bash
+python cli.py reset_encryption_key
+```
+
+#### Checking Encryption Status:
+```bash
+python cli.py check_encryption
+```
+
+### Command-Line Arguments
+
+The CLI accepts various command-line arguments and options, which are documented in each command's respective help message. Users can run the CLI with the `--help` option to get information about the available commands and their usage.
+
+### Configuration File
+
+The CLI uses a configuration file (`config.ini`) to store settings such as database paths, log file paths, and encryption keys. Users can modify the configuration file to customize the behavior of the Autonomous Data Collector Agent CLI.
+
+## Conclusion
+
+The Autonomous Data Collector Agent CLI provides a comprehensive set of commands for managing endpoints, applications, and configuration settings. Users can leverage these commands to interact with the agent, configure threading settings, perform CRUD operations on endpoints and applications, and manage encryption. The CLI aims to offer flexibility and ease of use for users working with the Autonomous Data Collector Agent.
+
+Let's outline the functionality and features of `random_data.py` based on the provided code comments:
+
+1. **Random Data Generation:**
+   - The code generates random data for applications and endpoints.
+   - The function `generate_random_data` returns a boolean value `True` indicating the success of the random data generation process.
+
+2. **Directory Handling:**
+   - Obtains the current script's directory using `os.path.dirname` and `os.path.abspath`.
+   - Appends the parent directory (`sample code`) to the Python path.
+
+3. **Faker Library Initialization:**
+   - Initializes the Faker library for generating fake data.
+
+4. **Functions for Generating Random Data:**
+   - `generate_random_date_time`: Generates a random date and time.
+   - `generate_random_payload`: Generates a random payload as a dictionary.
+   - `generate_random_filters`: Generates random filters as a list of dictionaries.
+   - `generate_random_app_data`: Generates random application data.
+   - `generate_random_endpoint_data`: Generates random endpoint data.
+
+5. **Usage Example:**
+   - Provides a usage example to generate random data for an application and endpoint.
+   - Generates 10 applications and 100 endpoints (10 per application).
+   - Prints the random application data and adds it to the database.
+   - Prints the random endpoint data.
+
+In summary, `random_data.py` is a script that generates random data for applications and endpoints using the Faker library. It provides functions for generating random dates, payloads, filters, application data, and endpoint data. The usage example demonstrates how to use these functions to generate and print random data for applications and endpoints.
+
+Let's break down the functions and features of `raw_api.py` based on the provided code:
+
+1. **Dummy Data for Testing:**
+   - `dummy_data`: A list of dictionaries representing dummy data for testing.
+
+2. **Data Generation Functions:**
+   - `generate_random_data()`: Returns a randomly chosen dictionary from the `dummy_data`.
+   - `get_fake_timestamp()`: Returns a fake timestamp in the format "%d-%m-%Y %H:%M:%S".
+
+3. **Custom API Request Handler:**
+   - `FakeAPIRequestHandler`: Subclass of `http.server.BaseHTTPRequestHandler` for handling HTTP requests.
+   - Defines `_send_response` method to send an HTTP response with a specified status code and data.
+   - Defines `do_POST` method to handle HTTP POST requests:
+      - Reads and parses the incoming JSON data.
+      - Generates a fake response containing data, timestamp, and metadata based on the received request.
+      - Sends the fake response using the `_send_response` method.
+   - Defines `do_GET` method to handle HTTP GET requests:
+      - Sends a 404 Not Found response.
+
+4. **Fake API Server Setup:**
+   - `run_fake_api()`: Sets up a TCP server on localhost at port 1006 using `socketserver.TCPServer` with `FakeAPIRequestHandler`.
+   - Prints a message indicating that the Fake API server is running.
+   - Calls `httpd.serve_forever()` to run the server indefinitely.
+
+5. **Conditional Execution:**
+   - The script includes an `if __name__ == '__main__':` block, which is currently commented out.
+   - When uncommented, it runs the `run_fake_api()` function.
+
+In summary, `raw_api.py` is a script that defines a simple fake API server using the Python `http.server` module. It includes functions to generate random data and fake timestamps, a custom API request handler to handle POST and GET requests, and a setup for a TCP server to run the fake API. The script is currently set to run the fake API server on port 1006 when executed directly.
+
+**SchedulerService Documentation**
+
+The `SchedulerService` class in `scheduler.py` represents a Windows service designed for scheduling and processing data collection tasks. Here's a detailed breakdown of its features and functionalities:
+
+1. **Imports:**
+   - The script imports various modules, including `win32serviceutil`, `win32service`, `win32event`, `servicemanager`, `socket`, `CronTab`, `json`, `os`, `requests`, `logging`, `concurrent.futures`, `base64`, and `urllib`.
+   - It also imports several modules from the `autonomous_data_collection_agent` package, such as `fileencryption`, `keycloak_auth`, `autonomousagent`, and others.
+
+2. **Logging Setup:**
+   - The script sets up logging using the `logging` module, configuring it to write log entries to a file.
+
+3. **SchedulerService Class:**
+   - Inherits from `win32serviceutil.ServiceFramework` to create a Windows service.
+   - Defines service name (`_svc_name_`) and display name (`_svc_display_name_`).
+   - Initializes necessary components, including a stop event and network timeout.
+
+4. **Service Lifecycle Methods:**
+   - `SvcStop`: Marks the service status as "stop pending" and signals the service to stop.
+   - `SvcDoRun`: Logs the start of the service and calls the `main` method.
+
+5. **Main Processing Loop:**
+   - The `main` method is the core of the service.
+   - Checks if threading is enabled and processes applications accordingly, with an option for concurrent threads.
+   - Uses a loop to repeatedly call `process_applications` based on threading configuration.
+
+6. **Application Processing:**
+   - `process_applications`: Processes applications and their associated endpoints sequentially or using multithreading.
+   - Retrieves active applications and iterates over them, checking for scheduled synchronizations.
+   - Calls `process_endpoint` for each endpoint in an application.
+
+7. **Endpoint Processing:**
+   - `process_endpoint`: Processes an endpoint by making an HTTP request, saving the response, and updating synchronization details.
+   - Utilizes multithreading if enabled, with configurable thread count.
+   - Handles exceptions and logs errors.
+
+8. **Data Filters Processing:**
+   - `process_filters`: Processes a list of filters, replacing empty or None values with the current datetime for specific columns.
+
+9. **HTTP Request Handling:**
+   - `make_request`: Constructs and sends HTTP requests based on application and endpoint data.
+   - Uses `requests` module and handles GET and POST requests.
+   - Supports basic and Keycloak authentication.
+
+10. **Response Handling:**
+    - `save_response`: Saves API responses to JSON files, encrypts them if file encryption is enabled.
+
+11. **Database Access Methods:**
+    - `_get_endpoints` and `_get_applications`: Retrieve instances of `autonomousagent.Endpoints` and `autonomousagent.Applications` respectively.
+
+12. **Service Initialization:**
+    - The script includes a block at the end to run the service when executed directly.
+    - Checks command-line arguments and either initializes the service or handles command-line arguments.
+
+13. **Configuration and Error Handling:**
+    - Relies on configurations from the `autonomous_data_collection_agent` package.
+    - Logs errors and exceptions with detailed information.
+
+In summary, the `SchedulerService` is a robust Windows service designed for scheduling and executing data collection tasks with support for multithreading, authentication, and flexible configurations. It interacts with the `autonomous_data_collection_agent` package to manage applications, endpoints, and related data.

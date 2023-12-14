@@ -1,0 +1,244 @@
+##
+
+##
+
+
+from cryptography.fernet import Fernet
+from autonomous_data_collection_agent import ERRORS, __app_name__, __version__, config
+import configparser
+import typer
+import os
+import ast
+
+class FileEncryption:
+    def __init__(self) -> None:
+        #--
+        if os.path.isfile(config.CONFIG_FILE_PATH):
+            self._config_parser = configparser.ConfigParser()
+            ##
+
+            self._config_parser.read(config.CONFIG_FILE_PATH)
+            ##
+
+            self._encryption_key = ast.literal_eval(self._config_parser["Encryption"]["key"])
+            self._encryption_enabled = self._config_parser["Encryption"]["enabled"]
+        else:
+            typer.secho(
+                'Config file not found. Please, run "autonomous_data_collection_agent init"',
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+    def check_if_enabled(self):
+        #--
+        if self._encryption_key is None:
+            return False
+        
+        return self._encryption_enabled == "True"
+     
+    def _check_if_enabled(self):
+        #--
+        if self._encryption_key is None:
+            typer.secho(
+                'Encryption key is not available. Please, run "autonomous_data_collection_agent init"',
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+        
+        return self._encryption_enabled == "True"
+    
+    def encypt_and_save_content(self, file_content, file_path):
+        #--
+        if self._check_if_enabled():
+            fernet = Fernet(self._encryption_key)
+
+            if not os.path.exists(file_path):
+                open(file_path, 'a').close()
+
+            if os.path.isfile(file_path):
+                ##
+
+                encrypted = fernet.encrypt(file_content)
+                
+                ##
+
+                ##
+
+                with open(file_path, 'wb') as encrypted_file:
+                    encrypted_file.write(encrypted)
+
+                return file_path
+            else:
+                typer.secho(
+                    'Please check File Path.',
+                    fg=typer.colors.RED,
+                )
+        else:
+            typer.secho(
+                'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+                fg=typer.colors.RED,
+            )
+    
+    def encypt_original_file(self, file_path):
+        #--
+        if self._check_if_enabled():
+            fernet = Fernet(self._encryption_key)
+            if os.path.isfile(file_path):
+                ##
+
+                with open(file_path, 'rb') as file:
+                    original = file.read()
+                ##
+
+                encrypted = fernet.encrypt(original)
+              
+                ##
+
+                ##
+
+                with open(file_path, 'wb') as encrypted_file:
+                    encrypted_file.write(encrypted)
+
+                return file_path
+            else:
+                typer.secho(
+                    fg=typer.colors.RED,
+                )
+        else:
+            typer.secho(
+                'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+                fg=typer.colors.RED,
+            )
+    
+    def encypt_file(self, source_file_path, destination_file_path):
+        #--
+        if self._check_if_enabled():
+            fernet = Fernet(self._encryption_key)
+            if not os.path.exists(destination_file_path):
+                open(destination_file_path, 'a').close()
+            if os.path.isfile(source_file_path) and os.path.isfile(destination_file_path):
+                ##
+
+                with open(source_file_path, 'rb') as file:
+                    file_contnet = file.read()
+                ##
+
+                encrypted = fernet.encrypt(file_contnet)
+                
+                ##
+
+                ##
+
+                with open(destination_file_path, 'wb') as encrypted_file:
+                    encrypted_file.write(encrypted)
+
+                return destination_file_path
+            else:
+                typer.secho(
+                    'Please check Source/ Destination File Path.',
+                    fg=typer.colors.RED,
+                ) 
+        else:
+            typer.secho(
+                'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+                fg=typer.colors.RED,
+            )
+    
+    def decypt_and_save_content(self, file_content, file_path):
+        #--
+        if self._check_if_enabled():
+            fernet = Fernet(self._encryption_key)
+
+            if not os.path.exists(file_path):
+                open(file_path, 'a').close()
+
+            if os.path.isfile(file_path):
+                ##
+
+                decrypted = fernet.encrypt(file_content)
+                
+                ##
+
+                ##
+
+                with open(file_path, 'wb') as decrypted_file:
+                    decrypted_file.write(decrypted)
+
+                return file_path
+            else:
+                typer.secho(
+                    'Please check File Path.',
+                    fg=typer.colors.RED,
+                )
+        else:
+            typer.secho(
+                'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+                fg=typer.colors.RED,
+            )
+    
+    def decypt_original_file(self, file_path):
+        #--
+        if self._check_if_enabled():
+            fernet = Fernet(self._encryption_key)
+            if os.path.isfile(file_path):
+                ##
+
+                with open(file_path, 'rb') as file:
+                    original = file.read()
+                ##
+
+                decrypted = fernet.encrypt(original)
+                ##
+
+                ##
+
+                with open(file_path, 'wb') as decrypted_file:
+                    decrypted_file.write(decrypted)
+
+                return file_path
+            else:
+                typer.secho(
+                    'Please check File Path.',
+                    fg=typer.colors.RED,
+                )
+        else:
+            typer.secho(
+                'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+                fg=typer.colors.RED,
+            )
+    
+    def decypt_file(self, source_file_path, destination_file_path):
+        #--
+        if self._check_if_enabled():
+            fernet = Fernet(self._encryption_key)
+
+            if not os.path.exists(destination_file_path):
+                open(destination_file_path, 'a').close()
+
+            if os.path.isfile(source_file_path) and os.path.isfile(destination_file_path):
+                ##
+
+                with open(source_file_path, 'rb') as file:
+                    file_contnet = file.read()
+                ##
+
+                decrypted = fernet.encrypt(file_contnet)
+                
+                ##
+
+                ##
+
+                with open(destination_file_path, 'wb') as decrypted_file:
+                    decrypted_file.write(decrypted)
+
+                return destination_file_path
+            else:
+                typer.secho(
+                    'Please check Source/ Destination File Path.',
+                    fg=typer.colors.RED,
+                ) 
+        else:
+            typer.secho(
+                'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+                fg=typer.colors.RED,
+            )

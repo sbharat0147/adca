@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>autonomous_data_collection_agent.tests.test_agent &#8212; Autonomous Data Collector Agent 1.0.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=039e1c02" />
+    <script src="../../../_static/documentation_options.js?v=2ab8bd80"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for autonomous_data_collection_agent.tests.test_agent</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pytest</span>
+<span class="kn">from</span> <span class="nn">typer.testing</span> <span class="kn">import</span> <span class="n">CliRunner</span>
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">__app_name__</span><span class="p">,</span>
+    <span class="n">__version__</span><span class="p">,</span>
+    <span class="n">cli</span><span class="p">,</span>
+    <span class="n">autonomousagent</span>
+<span class="p">)</span>
+
+<span class="c1"># Create a Pytest fixture to set up a CliRunner</span>
+<span class="c1"># @pytest.fixture</span>
+<span class="c1"># def runner():</span>
+<span class="c1">#     return CliRunner()</span>
+
+<span class="n">runner</span> <span class="o">=</span> <span class="n">CliRunner</span><span class="p">()</span>
+
+<div class="viewcode-block" id="test_enable_threading_default">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_enable_threading_default">[docs]</a>
+<span class="k">def</span> <span class="nf">test_enable_threading_default</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,[</span><span class="s2">&quot;enable-threading&quot;</span><span class="p">,</span> <span class="s2">&quot;-e&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Threading is set to enabled.&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_enable_threading_disabled">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_enable_threading_disabled">[docs]</a>
+<span class="k">def</span> <span class="nf">test_enable_threading_disabled</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,[</span><span class="s2">&quot;enable-threading&quot;</span><span class="p">,</span> <span class="s2">&quot;-e&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Threading is set to disabled.&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_set_concurrent_threads">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_set_concurrent_threads">[docs]</a>
+<span class="k">def</span> <span class="nf">test_set_concurrent_threads</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,[</span><span class="s2">&quot;set-concurrent-threads&quot;</span><span class="p">,</span> <span class="s2">&quot;4&quot;</span><span class="p">,</span> <span class="s2">&quot;-f&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Set Concurrent Threads Count to : 4&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_enable_encryption_disabled">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_enable_encryption_disabled">[docs]</a>
+<span class="k">def</span> <span class="nf">test_enable_encryption_disabled</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;enable-encryption&quot;</span><span class="p">,</span> <span class="s2">&quot;--enabled&quot;</span><span class="p">,</span> <span class="s2">&quot;False&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Encryption is set to disabled.&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_enable_encryption_default">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_enable_encryption_default">[docs]</a>
+<span class="k">def</span> <span class="nf">test_enable_encryption_default</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;enable-encryption&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Encryption is set to enabled.&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_reset_encryption_key">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_reset_encryption_key">[docs]</a>
+<span class="k">def</span> <span class="nf">test_reset_encryption_key</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;reset-encryption-key&quot;</span><span class="p">],</span> <span class="nb">input</span><span class="o">=</span><span class="s2">&quot;y</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Encryption key is reset.&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_check_encryption_enabled">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_check_encryption_enabled">[docs]</a>
+<span class="k">def</span> <span class="nf">test_check_encryption_enabled</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;check-encryption&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Encryption is&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_add_application">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_add_application">[docs]</a>
+<span class="k">def</span> <span class="nf">test_add_application</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span>
+        <span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;add-app&quot;</span><span class="p">,</span> <span class="s2">&quot;SampleApp&quot;</span><span class="p">,</span> <span class="s2">&quot;--short-name&quot;</span><span class="p">,</span> <span class="s2">&quot;sampleapp&quot;</span><span class="p">,</span> <span class="s2">&quot;--host&quot;</span><span class="p">,</span> <span class="s2">&quot;example.com&quot;</span><span class="p">,</span> <span class="s2">&quot;--dump-path&quot;</span><span class="p">,</span> <span class="s2">&quot;D:</span><span class="se">\\</span><span class="s2">scrapped_data</span><span class="se">\\</span><span class="s2">also&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Application &#39;SampleApp&#39; was added&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_add_application2">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_add_application2">[docs]</a>
+<span class="k">def</span> <span class="nf">test_add_application2</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span>
+        <span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;add-app&quot;</span><span class="p">,</span> <span class="s2">&quot;UpdatedApp&quot;</span><span class="p">,</span> <span class="s2">&quot;--short-name&quot;</span><span class="p">,</span> <span class="s2">&quot;updatedapp&quot;</span><span class="p">,</span> <span class="s2">&quot;--host&quot;</span><span class="p">,</span> <span class="s2">&quot;exampleupdate.com&quot;</span><span class="p">,</span> <span class="s2">&quot;--dump-path&quot;</span><span class="p">,</span> <span class="s2">&quot;D:</span><span class="se">\\</span><span class="s2">scrapped_data</span><span class="se">\\</span><span class="s2">updated&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Application &#39;UpdatedApp&#39; was added&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="sample_application_id">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.sample_application_id">[docs]</a>
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<span class="k">def</span> <span class="nf">sample_application_id</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">autonomousagent</span><span class="o">.</span><span class="n">get_application_id_by_short_name</span><span class="p">(</span><span class="s2">&quot;sampleapp&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="test_update_application">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_update_application">[docs]</a>
+<span class="k">def</span> <span class="nf">test_update_application</span><span class="p">(</span><span class="n">sample_application_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span>
+        <span class="s2">&quot;update-app&quot;</span><span class="p">,</span>
+        <span class="n">sample_application_id</span><span class="p">,</span>
+        <span class="s2">&quot;--name&quot;</span><span class="p">,</span> <span class="s2">&quot;New Name&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--host&quot;</span><span class="p">,</span> <span class="s2">&quot;new-host&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--url-scheme&quot;</span><span class="p">,</span> <span class="s2">&quot;https&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--auth-type&quot;</span><span class="p">,</span> <span class="s2">&quot;BASIC&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--dump-path&quot;</span><span class="p">,</span> <span class="s2">&quot;/path/to/dump&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--sync-frequency&quot;</span><span class="p">,</span> <span class="s2">&quot;*/30 * * * *&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--last-sync&quot;</span><span class="p">,</span> <span class="s2">&quot;01-01-2023 12:00:00&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--next-sync&quot;</span><span class="p">,</span> <span class="s2">&quot;01-02-2023 12:00:00&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--default-page-size&quot;</span><span class="p">,</span> <span class="s2">&quot;1000&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--process-status&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--status&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span>
+    <span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Application &#39;New Name&#39; was updated successfully.&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_list_applications">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_list_applications">[docs]</a>
+<span class="k">def</span> <span class="nf">test_list_applications</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;list-apps&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Application List:&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_application">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_application">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_application</span><span class="p">(</span><span class="n">sample_application_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-app&quot;</span><span class="p">,</span> <span class="n">sample_application_id</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Application List:&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_add_endpoint">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_add_endpoint">[docs]</a>
+<span class="k">def</span> <span class="nf">test_add_endpoint</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span>
+        <span class="s2">&quot;add-endpoint&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;Sample Endpoint&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--app-name&quot;</span><span class="p">,</span> <span class="s2">&quot;sampleapp&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--endpoint&quot;</span><span class="p">,</span> <span class="s2">&quot;sample-api-endpoint&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--method&quot;</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--page-size&quot;</span><span class="p">,</span> <span class="s2">&quot;100&quot;</span><span class="p">,</span>
+    <span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;was added&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="sample_endpoint_id">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.sample_endpoint_id">[docs]</a>
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<span class="k">def</span> <span class="nf">sample_endpoint_id</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">autonomousagent</span><span class="o">.</span><span class="n">get_endpoint_id_by_name</span><span class="p">(</span><span class="s2">&quot;Sample Endpoint&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="test_list_endpoints">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_list_endpoints">[docs]</a>
+<span class="k">def</span> <span class="nf">test_list_endpoints</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;list-endpoints&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Endpoint List&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_endpoint">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_endpoint">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_endpoint</span><span class="p">(</span><span class="n">sample_endpoint_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-endpoint&quot;</span><span class="p">,</span> <span class="n">sample_endpoint_id</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="sa">f</span><span class="s2">&quot;Endpoint List:&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_endpoint_by_name">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_endpoint_by_name">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_endpoint_by_name</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-endpoint-by-name&quot;</span><span class="p">,</span> <span class="s2">&quot;Sample Endpoint&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Endpoint List:&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_generate_fake">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_generate_fake">[docs]</a>
+<span class="k">def</span> <span class="nf">test_generate_fake</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;generate-fake&quot;</span><span class="p">,</span> <span class="s2">&quot;--apps&quot;</span><span class="p">,</span> <span class="s2">&quot;5&quot;</span><span class="p">,</span> <span class="s2">&quot;--endpoints&quot;</span><span class="p">,</span> <span class="s2">&quot;10&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Random Application Data and endpoint data generated successfully!&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<span class="c1"># def test_fake_server():</span>
+<span class="c1">#     result = runner.invoke(cli.app, &quot;run-fake-server&quot;)</span>
+<span class="c1">#     assert result.exit_code == 0</span>
+
+<div class="viewcode-block" id="test_test_scheduler">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_test_scheduler">[docs]</a>
+<span class="k">def</span> <span class="nf">test_test_scheduler</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="s2">&quot;test-scheduler&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>  <span class="c1"># You may need to adjust the expected exit code</span></div>
+
+
+<div class="viewcode-block" id="test_update_endpoint">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_update_endpoint">[docs]</a>
+<span class="k">def</span> <span class="nf">test_update_endpoint</span><span class="p">(</span><span class="n">sample_endpoint_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span>
+        <span class="s2">&quot;update-endpoint&quot;</span><span class="p">,</span>
+        <span class="n">sample_endpoint_id</span><span class="p">,</span>
+        <span class="s2">&quot;--app-name&quot;</span><span class="p">,</span> <span class="s2">&quot;updatedapp&quot;</span><span class="p">,</span>
+    <span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;updated successfully&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_remove_endpoint">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_remove_endpoint">[docs]</a>
+<span class="k">def</span> <span class="nf">test_remove_endpoint</span><span class="p">(</span><span class="n">sample_endpoint_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span>
+        <span class="s2">&quot;remove-endpoint&quot;</span><span class="p">,</span>
+        <span class="n">sample_endpoint_id</span><span class="p">,</span>
+        <span class="s2">&quot;--force&quot;</span>
+    <span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;was removed&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_remove_app_endpoints">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_remove_app_endpoints">[docs]</a>
+<span class="k">def</span> <span class="nf">test_remove_app_endpoints</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span>
+        <span class="s2">&quot;remove-app-endpoints&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sampleapp&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--force&quot;</span>
+    <span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;was removed&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_clear_endpoints">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_clear_endpoints">[docs]</a>
+<span class="k">def</span> <span class="nf">test_clear_endpoints</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;clear-endpoints&quot;</span><span class="p">,</span> <span class="s2">&quot;--force&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;All endpoints were removed&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_app_by_name">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_app_by_name">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_app_by_name</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-app-by-name&quot;</span><span class="p">,</span> <span class="s2">&quot;UpdatedApp&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Getting application # &#39;UpdatedApp&#39; failed&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_app_by_short_name">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_app_by_short_name">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_app_by_short_name</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-app-by-short-name&quot;</span><span class="p">,</span><span class="s2">&quot;updatedapp&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Getting application # &#39;updatedapp&#39; failed&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_app_by_status">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_app_by_status">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_app_by_status</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-app-by-status&quot;</span><span class="p">,</span><span class="s2">&quot;1&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Getting application # 1 failed with status:&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_get_app_by_process_status">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_get_app_by_process_status">[docs]</a>
+<span class="k">def</span> <span class="nf">test_get_app_by_process_status</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;get-app-by-process-status&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;Getting application # 1 failed with status:&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_update_app_status">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_update_app_status">[docs]</a>
+<span class="k">def</span> <span class="nf">test_update_app_status</span><span class="p">(</span><span class="n">sample_application_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;update-app-status&quot;</span><span class="p">,</span> <span class="n">sample_application_id</span><span class="p">,</span> <span class="s2">&quot;--status&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="sa">f</span><span class="s2">&quot;Application # </span><span class="si">{</span><span class="n">sample_application_id</span><span class="si">}</span><span class="s2"> updated successfully with status:&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_update_app_process_status">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_update_app_process_status">[docs]</a>
+<span class="k">def</span> <span class="nf">test_update_app_process_status</span><span class="p">(</span><span class="n">sample_application_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;update-app-process-status&quot;</span><span class="p">,</span> <span class="n">sample_application_id</span><span class="p">,</span> <span class="s2">&quot;--process-status&quot;</span><span class="p">,</span> <span class="s2">&quot;2&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="sa">f</span><span class="s2">&quot;Application # </span><span class="si">{</span><span class="n">sample_application_id</span><span class="si">}</span><span class="s2"> updated successfully with status:&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_remove_app">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_remove_app">[docs]</a>
+<span class="k">def</span> <span class="nf">test_remove_app</span><span class="p">(</span><span class="n">sample_application_id</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;remove-app&quot;</span><span class="p">,</span> <span class="n">sample_application_id</span><span class="p">,</span> <span class="s2">&quot;--force&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="sa">f</span><span class="s2">&quot;Application # </span><span class="si">{</span><span class="n">sample_application_id</span><span class="si">}</span><span class="s2"> was removed&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_clear_apps">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_clear_apps">[docs]</a>
+<span class="k">def</span> <span class="nf">test_clear_apps</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;clear-apps&quot;</span><span class="p">,</span> <span class="s2">&quot;--force&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="s2">&quot;All applications were removed&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_version_callback">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_version_callback">[docs]</a>
+<span class="k">def</span> <span class="nf">test_version_callback</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;--version&quot;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">__version__</span><span class="si">}</span><span class="s2">&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="test_main">
+<a class="viewcode-back" href="../../../autonomous_data_collection_agent.tests.html#autonomous_data_collection_agent.tests.test_agent.test_main">[docs]</a>
+<span class="k">def</span> <span class="nf">test_main</span><span class="p">():</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="n">cli</span><span class="o">.</span><span class="n">app</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">exit_code</span> <span class="o">==</span> <span class="mi">0</span>  <span class="c1"># You may need to adjust the expected exit code</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Autonomous Data Collector Agent</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../autonomous_data_collection_agent.html">autonomous_data_collection_agent package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../autonomous_data_collection_agent.tests.html">autonomous_data_collection_agent.tests package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Sgt Jai Singh.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

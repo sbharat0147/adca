@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>keycloak_auth.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>keycloak_auth.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>The <code>KeycloakAuth</code> class is used to authenticate and obtain an access token from a Keycloak server.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="n">ERRORS</span><span class="p">,</span> <span class="n">__app_name__</span><span class="p">,</span> <span class="n">__version__</span><span class="p">,</span> <span class="n">config</span>
+<span class="kn">import</span> <span class="nn">logging</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">KeycloakAuth</span><span class="p">:</span>
+    <span class="n">_keycloak_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">getKeycloakConfig</span><span class="p">()</span>
+    <span class="n">_keycloak_url</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">_client_id</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">_client_secret</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">_realm_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <pre><code>    The function initializes the class instance with authentication data, either from the provided
+    argument or from the class configuration.
+
+    :param auth_data: The `auth_data` parameter is a dictionary that contains authentication data
+    such as the Keycloak URL, client ID, client secret, and realm name. It is an optional parameter,
+    meaning it can be None or an empty dictionary. If `auth_data` is provided and not empty, the
+    values from
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">auth_data</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">auth_data</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">auth_data</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_url</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;keycloak_url&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_id</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;client_id&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_secret</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;client_secret&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_realm_name</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;realm_name&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_config</span><span class="p">[</span><span class="s2">&quot;keycloak_url&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_config</span><span class="p">[</span><span class="s2">&quot;client_id&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_secret</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_config</span><span class="p">[</span><span class="s2">&quot;client_secret&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_realm_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_config</span><span class="p">[</span><span class="s2">&quot;realm_name&quot;</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <pre><code>    The function sets authentication data for a Keycloak client.
+
+    :param auth_data: The `auth_data` parameter is a dictionary that contains the following keys:
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">set_auth_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">auth_data</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">auth_data</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">auth_data</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_url</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;keycloak_url&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_id</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;client_id&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_client_secret</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;client_secret&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_realm_name</span> <span class="o">=</span> <span class="n">auth_data</span><span class="p">[</span><span class="s2">&quot;realm_name&quot;</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <pre><code>    The function `get_token` sends a request to Keycloak to obtain an access token using client
+    credentials.
+    :return: the access token from the response JSON.
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_token</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;grant_type&#39;</span><span class="p">:</span> <span class="s1">&#39;client_credentials&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;client_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client_id</span> <span class="p">,</span>
+            <span class="s1">&#39;client_secret&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client_secret</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_url</span><span class="si">}</span><span class="s2">/auth/realms/</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_realm_name</span><span class="si">}</span><span class="s2">/protocol/openid-connect/token&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;access_token&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Keycloak token requets failed. Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="kc">None</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

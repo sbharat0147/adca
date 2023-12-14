@@ -1,0 +1,1226 @@
+import typer
+from datetime import datetime
+from autonomous_data_collection_agent import ERRORS, __app_name__, __version__, autonomousagent, config, database, random_data, raw_api
+from enum import Enum
+from autonomous_data_collection_agent.database import DatabaseHandler
+from autonomous_data_collection_agent.fileencryption import FileEncryption
+from autonomous_data_collection_agent.scheduler_simple import SchedulerService
+import os
+import logging  
+
+logging.basicConfig(filename=config.getLogFilePath(), filemode='a', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt="%d-%b-%y %H:%M:%S", level=logging.DEBUG)
+
+
+app = typer.Typer()
+
+@app.command()
+    
+def init(
+    endpoint_db_path: str = typer.Option(
+        str(database.ENDPOINT_DB_FILE_PATH),
+        "--endpoint-db-path",
+        "-endpoint-db",
+        prompt="endpoint database location?",
+    ),
+    app_db_path: str = typer.Option(
+        str(database.APP_DB_FILE_PATH),
+        "--app-db-path",
+        "-app-db",
+        prompt="application database location?",
+    ),
+) -> None:
+    #--
+
+    logging.info("Initializing the databases")
+
+    db_list = [
+        ('endpoint', endpoint_db_path),
+        ('app', app_db_path)
+    ]
+    
+    def _run_init():
+        app_init_error = config.init_app(db_list)
+        if app_init_error:
+            typer.secho(
+                f'Creating config file failed with "{ERRORS[app_init_error]}"',
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+        logging.info("Config file created successfully")
+
+        for db_name, db_path in db_list:
+            db_init_error = database.init_database(db_path)
+            if db_init_error:
+                typer.secho(
+                    f'Creating {db_name} database failed with "{ERRORS[db_init_error]}"',
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+            else:
+                typer.secho(f"The {db_name} database is {db_path}", fg=typer.colors.GREEN)
+
+                logging.info(f"{db_name} database created successfully")
+
+    if os.path.isfile(config.CONFIG_FILE_PATH):
+        typer.secho(
+            f'\n\nImportant Notice !\n\n',
+            fg=typer.colors.RED,
+            bold=True,
+        )
+
+        red_style = typer.style(text="Config file exists and proceeding further will reset the file and databases. You will lose existing data which is irreversible. Do you still want to proceed?", fg=typer.colors.RED, bold=True)
+     
+        reset = typer.confirm(
+            red_style,
+            default=False,  
+
+            show_default=True,  
+
+        )
+        if reset:
+            _run_init()
+        else:
+            typer.echo("Operation canceled")
+    else:
+        _run_init()
+
+@app.command("enable-threading")
+def enable_threading(
+    is_enabled: str = typer.Option(
+        True,
+        "--enabled",
+        "-e",
+        help="Enable threading for concurrent downloads.",
+    )
+) -> None:
+    status = False
+    if os.path.isfile(config.CONFIG_FILE_PATH):
+        status = config.enable_threading(is_enabled)
+       
+        if str(is_enabled) == "True":
+            state = "enabled"
+        else:
+            state = "disabled"
+
+        if status:
+            logging.info(f'Threading failed with "{ERRORS[status]}"')
+            typer.secho(
+                f'Threading failed with "{ERRORS[status]}"', fg=typer.colors.RED
+            )
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                f"""Threading is set to {state}.""",
+                fg=typer.colors.GREEN,
+            )
+            ##
+
+            logging.info(f"Threading is set to {state}")
+
+@app.command("set-concurrent-threads")
+def set_concurrent_threads(
+    thread_count: int = typer.Argument(...,help="Number of threads the CPU can support"),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force deletion without confirmation.",
+    )
+) -> None:
+
+    def _set_threads():
+        if os.path.isfile(config.CONFIG_FILE_PATH):
+            error = config.set_concurrent_threads(thread_count)
+
+            if error:
+                typer.secho(
+                    f'Set Concurrent Threads Count failed with "{ERRORS[error]}"', fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+            else:
+                typer.secho(
+                    f"""Set Concurrent Threads Count to : {thread_count}""",
+                    fg=typer.colors.GREEN,
+                )
+                ##
+
+                logging.info(f"""Set Concurrent Threads Count to : {thread_count}""")
+
+    custom_style = typer.style(text="\nThread count must be thought out as per CPU count on machine as it might chock the machine if set to higher number. Do you still want to proceed?\n\n", fg=typer.colors.CYAN, bold=True)
+
+    if force:
+        _set_threads()
+    else: 
+        set_threads = typer.confirm(
+            custom_style,
+            default=False,  ##
+
+            show_default=True,  ##
+
+        )
+    
+        if set_threads:
+            _set_threads()
+        else:
+            typer.echo("Operation canceled") 
+
+@app.command("enable-encryption")
+def enable_encryption(
+    is_enabled: str = typer.Option(
+        True,
+        "--enabled",
+        "-e",
+        help="Enable File Encryption.",
+    )
+) -> None:
+    #--
+    status = False
+    if os.path.isfile(config.CONFIG_FILE_PATH):
+        status = config.enable_encryption(is_enabled)
+        if str(is_enabled) == "True":
+            state = "enabled"
+        else:
+            state = "disabled"
+
+        if status:
+            typer.secho(
+                f'Encryption failed with "{ERRORS[status]}"', fg=typer.colors.RED
+            )
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                f"""Encryption is set to {state}.""",
+                fg=typer.colors.GREEN,
+            )
+
+        logging.info(f"File encryption is set to {state}")
+
+@app.command("reset-encryption-key")
+def reset_encryption_key() -> None:
+    #--
+    def _reset():
+        if os.path.isfile(config.CONFIG_FILE_PATH):
+            error = config.reset_encryption_key()
+
+            if error:
+                typer.secho(
+                    f'Encryption key reset failed with "{ERRORS[error]}"', fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+            else:
+                typer.secho(
+                    f"""Encryption key is reset.""",
+                    fg=typer.colors.GREEN,
+                )
+                ##
+
+                logging.info("Encryption key has been reset.")
+
+    reset = typer.confirm(
+        f"Resetting encryption key will result in the loss of currently encrypted data. Do you still want to proceed?"
+    )
+    if reset:
+        _reset()
+    else:
+        typer.echo("Operation canceled")
+
+@app.command("check-encryption")
+def check_encryption() -> None:
+    #--
+    file_encryption = FileEncryption()
+    if file_encryption.check_if_enabled():
+        typer.secho(
+            'Encryption is enabled.',
+            fg=typer.colors.BRIGHT_MAGENTA,
+        )
+    else:
+        typer.secho(
+            'Encryption is not enabled. Please, run "autonomous_data_collection_agent enable-encryption" .',
+            fg=typer.colors.RED,
+        )
+
+def get_endpoints() -> autonomousagent.Endpoints:
+    #--
+    if os.path.isfile(config.CONFIG_FILE_PATH):
+        db_path = database.get_database_path(config.CONFIG_FILE_PATH, 'endpoint')
+    else:
+        typer.secho(
+            'Config file not found. Please, run "autonomous_data_collection_agent init"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    if os.path.isfile(db_path):
+        return autonomousagent.Endpoints(db_path)
+    else:
+        typer.secho(
+            'Database not found. Please, run "autonomous_data_collection_agent init"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+def get_applications() -> autonomousagent.Applications:
+    #--
+    if os.path.isfile(config.CONFIG_FILE_PATH):
+        db_path = database.get_database_path(config.CONFIG_FILE_PATH, 'app')
+    else:
+        typer.secho(
+            'Config file not found. Please, run "autonomous_data_collection_agent init"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    if os.path.isfile(db_path):
+        return autonomousagent.Applications(db_path)
+    else:
+        typer.secho(
+            'Database not found. Please, run "autonomous_data_collection_agent init"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+##
+
+class HttpMethod(Enum):
+    #--
+    NONE = "None"
+    GET = "GET"
+    POST = "POST"
+
+def validate_datetime(datetime_str):
+    #--
+
+    try:
+        if datetime_str is None:
+            return None
+        else:
+            return datetime.strptime(datetime_str, '%d-%m-%Y %H:%M:%S')
+    except ValueError:
+        raise typer.BadParameter("Invalid datetime format. Please use 'DD-MM-YYYY hh:mm:ss'.")
+    
+@app.command("add-endpoint")
+def add_endpoint(
+    name: str = typer.Argument(...,help="Name of Endpoint"),
+    app_short_name: str = typer.Option(..., "--app-name", "-a", help="Application Short Name"),  
+    url_endpoint: str = typer.Option(..., "--endpoint", "-e", help="Actual url endpoint without prefix or sufix / i.e. data-export-generic-api "),
+    method: HttpMethod = typer.Option("GET", "--method", "-m", help="Request method to use (GET or POST)"),
+    payload: str = typer.Option({}, "--payload", "-p", help="JSON payload for the request"),
+    filters: str = typer.Option([], "--filters", "-f", help="Filters as a list of fitler dictionaries"),  
+    page_size: int = typer.Option(1000, "--page-size", "-ps", min=1, max=10000, help="Page size (default: 1000)"),
+    last_sync: str = typer.Option(
+        None,
+        "--last-sync",
+        "-l",
+        help="Last synchronization date and time in the format 'DD-MM-YYYY hh:mm:ss'",
+        callback=validate_datetime,
+    ),
+    process_status: int = typer.Option(0, "--process-status", "-prs", min=0, max=2, help="Process status (0=>not processed, 1=>inprocess, or 2=>processed)"),
+    status: int = typer.Option(1, "--status", "-s", min=0, max=2, help="Status (0=>distabled, 1=>enabled)"),
+) -> None:
+    #--
+    ##
+
+
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.add(name, app_short_name, url_endpoint, method.value, payload, filters, page_size, last_sync, process_status, status)
+    endpoint = endpoint_result.endpoint
+    error = endpoint_result.error
+
+    if error:
+        typer.secho(
+            f'Adding endpoint failed with "{ERRORS[error]}"', fg=typer.colors.RED
+        )
+        logging.error(f"Failed to add endpoint: {name} for app: {app_short_name} - Error: {ERRORS[error]}")
+        raise typer.Exit(1)
+    else:
+        typer.secho(
+            f"""endpoint: "{endpoint['name']}" was added """
+            f"""for app: {app_short_name} """
+            f"""with url endpoint: {url_endpoint}""",
+            fg=typer.colors.GREEN,
+        )
+        logging.info(f"Added endpoint: {name} for app: {app_short_name} with URL endpoint: {url_endpoint}")
+
+def cli_render_endpints(endpoints) -> None:
+    #--
+    if len(endpoints) == 0:
+        typer.secho(
+            "There are no endpoints in the list yet", fg=typer.colors.RED
+        )
+        raise typer.Exit()
+    typer.secho("\nEndpoint List:\n", fg=typer.colors.BLUE, bold=True)
+    columns = (
+        "ID.                       ",
+        "| Name                                       ",
+        "| App Short Name       ",
+        "| URL Endpoint                                 ",
+        "| Method     ",
+        "| Payload                                                                        ",
+        "| Filters                                                                                                                                    ",
+        "| Page Size  ",
+        "| Last Sync                         ",
+        "| Process Status  ",
+        "| Status  ",
+    )
+    headers = "".join(columns)
+    typer.secho(headers, fg=typer.colors.BLUE, bold=True)
+    typer.secho("-" * len(headers), fg=typer.colors.BLUE)
+    app_handler = DatabaseHandler(database.get_database_path(config.CONFIG_FILE_PATH, 'app'))
+    
+    def _column_len(column_val):
+        if column_val is None:
+            return 0
+        elif isinstance(column_val, int):
+            return len(str(column_val))
+        else:
+            return len(column_val)
+        
+    for endpoint_id in endpoints:
+        endpoint = endpoints[endpoint_id]
+        name = endpoint['name']
+        app_id = endpoint['app_id']
+        url_endpoint = endpoint['url_endpoint']
+        method = endpoint['method']
+        payload = endpoint['payload']
+        filters = endpoint['filters']
+        page_size = endpoint['page_size']
+        last_sync = endpoint['last_sync']
+        process_status = endpoint['process_status']
+        status = endpoint['status']
+
+        try:
+            app_data = app_handler.get_by_id(app_id)
+            app_short_name = app_data.item_list[0]["short_name"]
+        except IndexError:
+            app_short_name = app_id
+        
+        typer.secho(
+            f"{endpoint_id}{(len(columns[0]) - _column_len(str(endpoint_id))) * ' '}"
+            f"| {name}{(len(columns[1]) - _column_len(name)-2) * ' '}"
+            f"| {app_short_name}{(len(columns[2]) - _column_len(app_short_name)-2) * ' '}"
+            f"| {url_endpoint}{(len(columns[3]) - _column_len(url_endpoint)-2) * ' '}"
+            f"| {method}{(len(columns[4]) - _column_len(method)-2) * ' '}"
+            f"| {payload}{(len(columns[5]) - _column_len(payload)-2) * ' '}"
+            f"| {filters}{(len(columns[6]) - _column_len(filters)-4) * ' '}"
+            f"| {page_size}{(len(columns[7]) - _column_len(str(page_size)) - 2) * ' '}"
+            f"| {last_sync}{(len(columns[8]) - _column_len(str(last_sync)) - 2) * ' '}"
+            f"| {process_status}{(len(columns[9]) - _column_len(str(process_status)) - 4) * ' '}"
+            f"| {status}{(len(columns[10]) - _column_len(str(status)) - 4) * ' '}",
+            fg=typer.colors.BLUE,
+        )
+
+    typer.secho("-" * len(headers) + "\n", fg=typer.colors.BLUE)
+
+@app.command("list-endpoints")
+def list_endpoints() -> None:
+    #--
+    endpoints = get_endpoints()
+    all_endpoints = endpoints.get_endpoint_list()
+    cli_render_endpints(all_endpoints)
+
+@app.command("list-app-endpoints")
+def list_app_endpoints(app_short_name: str = typer.Argument(..., help='Provide application short name')) -> None:
+    #--
+    endpoints = get_endpoints()
+    all_endpoints = endpoints.get_app_endpoints(app_short_name)
+    
+    cli_render_endpints(all_endpoints)
+
+@app.command("get-endpoint")
+def get_endpoint(endpoint_id: str = typer.Argument(..., help='Get a endpoint using its ENDPOINT_ID')) -> None:
+    #--
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.get_endpoint_by_id(endpoint_id)
+    endpoint = endpoint_result.endpoint
+    error = endpoint_result.error
+    if error:
+        typer.secho(
+            f'Getting endpoint # "{endpoint_id}" failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    else:
+       cli_render_endpints({endpoint_id: endpoint})
+
+@app.command("get-endpoint-by-name")
+def get_endpoint_by_name(endpoint_name: str = typer.Argument(..., help='Get a endpoint using its endpoint name')) -> None:
+    #--
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.get_endpoint_by_name(endpoint_name)
+    endpoint = endpoint_result.endpoint
+    error = endpoint_result.error
+    if error:
+        typer.secho(
+            f'Getting endpoint name "{endpoint_name}" failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    else:
+       cli_render_endpints(endpoint)
+
+@app.command("get-endpoint-by-process-status")
+def get_app_endpoints_by_status(
+    process_status: int = typer.Argument(0, min=0, max=2, help='Get a endpoint using its process status'),
+    app_short_name: str = typer.Option(..., "-short-name", "-s", help='Provide application short name')
+) -> None:
+    #--
+    endpoints = get_endpoints()
+    endpoint_list = endpoints.get_app_endpoints_by_process_status(app_short_name, process_status)
+    cli_render_endpints(endpoint_list)
+
+@app.command("get-endpoint-by-status")
+def get_app_endpoints_by_status(
+    status: int = typer.Argument(0, min=0, max=2, help='Get a endpoint using its status'),
+    app_short_name: str = typer.Option(..., "--short-name", "-s", help='Provide application short name')
+) -> None:
+    #--
+    endpoints = get_endpoints()
+    endpoint_list = endpoints.get_app_endpoints_by_status(app_short_name, status)
+    cli_render_endpints(endpoint_list)
+
+@app.command("get-endpoint-by-url")
+def get_endpoint_by_url(url_endpoint: str = typer.Argument(..., help='Get a endpoint using its endpoint url')) -> None:
+    #--
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.get_endpoint_by_url(url_endpoint)
+    endpoint = endpoint_result.endpoint
+    error = endpoint_result.error
+    if error:
+        typer.secho(
+            f'Getting endpoint url "{url_endpoint}" failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    else:
+       cli_render_endpints(endpoint)
+
+@app.command("update-endpoint")
+def update_endpoint(
+    endpoint_id: str = typer.Argument(..., help="ID of the endpoint to update"),
+    name: str = typer.Option(None, "--name", "-n", help="New name of the endpoint"),
+    app_short_name: str = typer.Option(None, "--app-name", "-a", help="New application short name"),
+    url_endpoint: str = typer.Option(None, "--endpoint", "-e", help="New URL endpoint"),
+    method: HttpMethod = typer.Option(None, "--method", "-m", help="New request method (GET or POST)"),
+    payload: str = typer.Option(None, "--payload", "-p", help="New JSON payload for the request"),
+    filters: str = typer.Option(None, "--filters", "-f", help="New list of filters as JSON string"),
+    page_size: int = typer.Option(None, "--page-size", "-ps", min=1, max=10000, help="New page size (default: 1000)"),
+    last_sync: str = typer.Option(None, "--last-sync", "-l", help="New last synchronization date and time in the format 'DD-MM-YYYY hh:mm:ss'"),
+    process_status: int = typer.Option(None, "--process-status", "-prs", min=0, max=2, help="New process status (0=>not processed, 1=>inprocess, or 2=>processed)"),
+    status: int = typer.Option(None, "--status", "-s", min=0, max=2, help="Endpoint status (0=>disabled, 1=>enabled)"),
+) -> None:
+    #--
+    ##
+
+
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.get_endpoint_by_id(endpoint_id)
+    endpoint = endpoint_result.endpoint
+    error = endpoint_result.error
+    if endpoint is None:
+        typer.secho("Endpoint not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    ##
+
+    if name is not None:
+        endpoint["name"] = name
+    if app_short_name is not None:
+        app_handler = DatabaseHandler(database.get_database_path(config.CONFIG_FILE_PATH, 'app'))
+        try:
+            app_id = next(iter(app_handler.get_by_column("short_name", app_short_name).item_list))
+            endpoint["app_id"] = app_id
+        except IndexError:
+            typer.secho(f"App {app_short_name} not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    if url_endpoint is not None:
+        endpoint["url_endpoint"] = url_endpoint
+    if method is not None:
+        endpoint["method"] = method
+    if payload is not None:
+        endpoint["payload"] = payload
+    if filters is not None:
+        endpoint["filters"] = filters
+    if page_size is not None:
+        endpoint["page_size"] = page_size
+    if last_sync is not None:
+        endpoint["last_sync"] = last_sync
+    if process_status is not None:
+        endpoint["process_status"] = process_status
+    if status is not None:
+        endpoint["status"] = status
+
+    endpoint_result = endpoints.update_endpoint(endpoint_id, endpoint)
+    endpoint = endpoint_result.endpoint
+    error = endpoint_result.error
+    if error:
+        typer.secho(
+            f'updating endpoint # {endpoint_id} failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        logging.error(f'updating endpoint # {endpoint_id} failed with "{ERRORS[error]}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(
+            f"""endpoint # {endpoint_id} updated successfully""",
+            fg=typer.colors.GREEN,
+        )
+        logging.info(f"""endpoint # {endpoint_id} updated successfully""")
+
+@app.command("update-endpoint-process-status")
+def update_endpoint_process_status(
+    endpoint_id: str = typer.Argument(..., help="ID of the endpoint to update"),
+    process_status: int = typer.Option(1, "--process-status", "-prs", min=0, max=2, help="Endpoint process status (0=>not processed, 1=>inprocess, or 2=>processed)"),
+) -> None:
+    #--
+    ##
+
+
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.update_endpoint_process_status(endpoint_id, process_status)
+    error = endpoint_result.error
+    if error:
+        typer.secho(
+            f'updating endpoint # {endpoint_id} failed with process status: "{process_status}"',
+            fg=typer.colors.RED,
+        )
+        logging.error(f'updating endpoint # {endpoint_id} failed with process status: "{process_status}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(
+            f"""endpoint # {endpoint_id} updated successfully with process status: "{process_status}" """,
+            fg=typer.colors.GREEN,
+        )
+        logging.info(f"""endpoint # {endpoint_id} updated successfully with process status: "{process_status}" """)
+
+@app.command("update-endpoint-status")
+def update_endpoint_status(
+    endpoint_id: str = typer.Argument(..., help="ID of the endpoint to update"),
+    status: int = typer.Option(1, "--status", "-s", min=0, max=1, help="Endpoint status (0=>disabled, 1=>enabled)"),
+) -> None:
+
+    endpoints = get_endpoints()
+    endpoint_result = endpoints.update_endpoint_status(endpoint_id, status)
+    error = endpoint_result.error
+    status_txt = "enabled" if status == 1 else "disabled"
+
+    if error:
+        typer.secho(
+            f'updating endpoint # {endpoint_id} failed with status: "{status_txt}"',
+            fg=typer.colors.RED,
+        )
+        logging.error(f'updating endpoint # {endpoint_id} failed with status: "{status_txt}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(
+            f"""endpoint # {endpoint_id} updated successfully with status: "{status_txt}" """,
+            fg=typer.colors.GREEN,
+        )
+        logging.info(f"""endpoint # {endpoint_id} updated successfully with status: "{status_txt}" """)
+
+@app.command("remove-endpoint")
+def remove_endpoint(
+    endpoint_id: str = typer.Argument(...),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force deletion without confirmation.",
+    ),
+) -> None:
+    #--
+    endpoints = get_endpoints()
+
+    def _remove():
+        endpoint_result = endpoints.remove(endpoint_id)
+        error = endpoint_result.error
+        if error:
+            typer.secho(
+                f'Removing endpoint # {endpoint_id} failed with "{ERRORS[error]}"',
+                fg=typer.colors.RED,
+            )
+            logging.error(f'Removing endpoint # {endpoint_id} failed with "{ERRORS[error]}"')
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                f"""endpoint # {endpoint_id} was removed""",
+                fg=typer.colors.GREEN,
+            )
+            logging.info(f"""endpoint # {endpoint_id} was removed""")
+
+    if force:
+        _remove()
+    else:
+        try:
+            endpoint_result = endpoints.get_endpoint_by_id(endpoint_id)
+            endpoint = endpoint_result.endpoint
+            error = endpoint_result.error
+            if error:
+                typer.secho("Invalid ENDPOINT_ID", fg=typer.colors.RED)
+                raise typer.Exit(1)
+        except IndexError:
+            typer.secho("Invalid ENDPOINT_ID", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        delete = typer.confirm(
+            f"Delete endpoint # {endpoint_id} with name : {endpoint['name']}?"
+        )
+        if delete:
+            _remove()
+        else:
+            typer.echo("Operation canceled")
+
+@app.command("remove-app-endpoints")
+def remove_app_endpoints(
+    app_short_name: str = typer.Argument(..., help="New application short name"),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force deletion without confirmation.",
+    ),
+) -> None:
+    #--
+    endpoints = get_endpoints()
+
+    def _remove():
+        endpoint_obj = endpoints.remove_all_by_app(app_short_name)
+        error = endpoint_obj.error
+        if error:
+            typer.secho(
+                f'Removing endpoints for app # {app_short_name} failed with "{ERRORS[error]}"',
+                fg=typer.colors.RED,
+            )
+            logging.error(f'Removing endpoints for app # {app_short_name} failed with "{ERRORS[error]}"')
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                f"""endpoints for app # {app_short_name} was removed.""",
+                fg=typer.colors.GREEN,
+            )
+            logging.info(f"""endpoints for app # {app_short_name} was removed.""")
+
+    if force:
+        _remove()
+    else:
+        delete = typer.confirm(
+            f"Delete endpoints with app short name : {app_short_name}?"
+        )
+        if delete:
+            _remove()
+        else:
+            typer.echo("Operation canceled")
+
+@app.command(name="clear-endpoints")
+def remove_all_endpoints(
+    force: bool = typer.Option(
+        False,
+        prompt="Delete all endpoints?",
+        help="Force deletion without confirmation.",
+    ),
+) -> None:
+    #--
+    endpoints = get_endpoints()
+    if force:
+        error = endpoints.remove_all().error
+        if error:
+            typer.secho(
+                f'Removing endpoints failed with "{ERRORS[error]}"',
+                fg=typer.colors.RED,
+            )
+            logging.error(f'Removing endpoints failed with "{ERRORS[error]}"')
+            raise typer.Exit(1)
+        else:
+            typer.secho("All endpoints were removed", fg=typer.colors.GREEN)
+            logging.info("All endpoints were removed")
+    else:
+        typer.echo("Operation canceled")
+
+##
+
+##
+
+class UrlSchemes(Enum):
+    http = "http"
+    https = "https"
+
+##
+
+class AuthTypes(Enum):
+    NONE = "NONE"
+    BASIC = "BASIC"
+    KEYCLOAK = "KEYCLOAK"
+
+@app.command(name="add-app")
+def add_application(
+    name: str = typer.Argument(..., help="Name of the application"),
+    short_name: str = typer.Option(..., "--short-name", "-sn", help="Short name of the application"),
+    host: str = typer.Option(..., "--host", "-h", help="Host of the application"),
+    url_scheme: UrlSchemes = typer.Option("https", "--url-scheme", "-u", help="URL scheme (http or https)"),
+    auth_type: AuthTypes = typer.Option("NONE", "--auth-type", "-at", help="Authentication type (NONE, KEYCLOAK, BASIC)"),
+    auth_data: str = typer.Option({}, "--authdata", "-c", help="JSON payload for the authdata"),
+    dump_path: str = typer.Option(..., "--dump-path", "-d", callback=autonomousagent.Applications.check_and_create_directory, help="Path for dumping the files"), 
+    sync_frequency: str = typer.Option(
+        "0 23 * * *", 
+        "--sync-frequency", 
+        "-sf",
+        callback=autonomousagent.Applications.is_valid_cronjob,
+        help="Sync frequency (cronjob) */30 * * * *"
+    ),
+    last_sync: str = typer.Option(
+        None,
+        "--next-sync",
+        "-n",
+        help="Last synchronization date and time in the format 'DD-MM-YYYY hh:mm:ss'",
+        callback=validate_datetime,
+    ),
+    next_sync: str = typer.Option(
+        None,
+        "--last-sync",
+        "-l",
+        help="Last synchronization date and time in the format 'DD-MM-YYYY hh:mm:ss'",
+        callback=validate_datetime,
+    ),
+    default_payload: str = typer.Option({}, "--payload", "-p", help="JSON payload for the request"),
+    default_filters: str = typer.Option([], "--filters", "-df", help="Filters as a list of fitler dictionaries"), 
+    default_page_size: int = typer.Option(1000, "--default-page-size", "-dp", min=1, max=10000, help="Default page size (1000)"),
+    process_status: int = typer.Option(0, "--process-status", "-prs", min=0, max=2, help="Process status (0=>not processed, 1=>inprocess, or 2=>processed)"),
+    status: int = typer.Option(1, "--status", "-s", min=0, max=2, help="Applicaiton status (0=>disabled, 1=>enabled)"),
+):
+    #--
+
+    last_sync_datetime = datetime.strptime(last_sync, '%d-%m-%Y %H:%M:%S') if last_sync  else None
+    next_sync_datetime = datetime.strptime(next_sync, '%d-%m-%Y %H:%M:%S') if next_sync else None
+
+    applications = get_applications()
+    application_result = applications.add(
+        name, short_name, host, url_scheme.value, auth_type.value, auth_data, dump_path, sync_frequency, last_sync_datetime, next_sync_datetime, default_payload, default_filters, default_page_size, process_status, status
+    )
+    application = application_result.application
+    error = application_result.error
+    if error:
+        typer.secho(
+            f'Adding application failed with "{ERRORS[error]}"', fg=typer.colors.RED
+        )
+        logging.error(f'Adding application failed with "{ERRORS[error]}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(f"Application '{name}' was added. ID: #'{application[0]}'", fg=typer.colors.GREEN)
+        logging.info(f"Application #'{application[0]}' was added")
+
+@app.command(name="update-app")
+def update_application(
+    app_id: str = typer.Argument(..., help="ID of the application to update"),
+    name: str = typer.Option(None, "--name", "-n", help="Name of the application"),
+    short_name: str = typer.Option(None, "--short-name", "-sn", help="Short name of the application"),
+    host: str = typer.Option(None, "--host", "-h", help="Host of the application"),
+    url_scheme: UrlSchemes = typer.Option(None, "--url-scheme", "-u", help="URL scheme (http or https)"),
+    auth_type: AuthTypes = typer.Option(None, "--auth-type", "-at", help="Authentication type (NA, KEYCLOAK, BASIC)"),
+    auth_data: str = typer.Option(None, "--authdata", "-ad", help="JSON payload for the authdata"),
+    dump_path: str = typer.Option(None, "--dump-path", "-dp", callback=autonomousagent.Applications.check_and_create_directory, help="Path for dumping the files"), 
+    sync_frequency: str = typer.Option(
+        None, 
+        "--sync-frequency", 
+        "-sf",
+        callback=autonomousagent.Applications.is_valid_cronjob,
+        help="Sync frequency (cronjob) */30 * * * *"
+    ),
+    last_sync: str = typer.Option(
+        None,
+        "--next-sync",
+        "-ns",
+        help="Last synchronization date and time in the format 'DD-MM-YYYY hh:mm:ss'",
+        callback=validate_datetime,
+    ),
+    next_sync: str = typer.Option(
+        None,
+        "--last-sync",
+        "-ls",
+        help="Last synchronization date and time in the format 'DD-MM-YYYY hh:mm:ss'",
+        callback=validate_datetime,
+    ),
+    default_payload: str = typer.Option(None, "--payload", "-p", help="JSON payload for the request"),
+    default_filters: str = typer.Option(None, "--filters", "-df", help="Filters as a list of fitler dictionaries"), 
+    default_page_size: int = typer.Option(None, "--default-page-size", "-dp", min=1, max=10000, help="Default page size (1000)"),
+    process_status: int = typer.Option(None, "--process-status", "-prs", min=0, max=2, help="Process status (0=>not processed, 1=>inprocess, or 2=>processed)"),
+    status: int = typer.Option(None, "--status", "-s", min=0, max=2, help="Application status (0=>disabled, 1=>enabled)"),
+):
+    #--
+
+    applications = get_applications()
+    application_result = applications.get_app_by_id(app_id)
+    application = application_result.application
+    error = application_result.error
+
+    if name is not None:
+        application["name"] = name
+    if short_name is not None:
+        application["short_name"] = short_name
+    if host is not None:
+        application["host"] = host
+    if url_scheme is not None:
+        application["url_scheme"] = url_scheme.value
+    if auth_type is not None:
+        application["auth_type"] = auth_type.value
+    if auth_data is not None:
+        application["auth_data"] = auth_data
+    if dump_path is not None:
+        application["dump_path"] = dump_path
+    if sync_frequency is not None:
+        application["sync_frequency"] = sync_frequency
+    if last_sync is not None:
+        application["last_sync"] = last_sync
+    if next_sync is not None:
+        application["next_sync"] = next_sync
+    if default_payload is not None:
+        application["default_payload"] = default_payload
+    if default_filters is not None:
+        application["default_filters"] = default_filters
+    if default_page_size is not None:
+        application["default_page_size"] = default_page_size
+    if process_status is not None:
+        application["process_status"] = process_status
+    if status is not None:
+        application["status"] = status
+
+    application_result = applications.update_app(APP_ID=app_id, data=application)
+    application = application_result.application
+    error = application_result.error
+    if error:
+        typer.secho(
+            f'Updating application failed with "{ERRORS[error]}"', fg=typer.colors.RED
+        )
+        logging.error(f'Updating application failed with "{ERRORS[error]}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(f"Application '{application['name']}' was updated successfully.", fg=typer.colors.GREEN)
+        logging.info(f"Application '{application['name']}' was updated successfully.")
+
+def cli_render_application(applications) -> None:
+    #--
+    if len(applications) == 0:
+        typer.secho(
+            "There are no application in the list yet", fg=typer.colors.RED
+        )
+        raise typer.Exit()
+    typer.secho("\nApplication List:\n", fg=typer.colors.BLUE, bold=True)
+    columns = (
+         "ID.                      ",
+        "| Name                      ",
+        "| Short Name ",
+        "| Host                 ",
+        "| URL Scheme  ",
+        "| Auth Type  ",
+        "| Auth Data               ",
+        "| Dump Path                                                                                  ",
+        "| Sync Frequency  ",
+        "| Last Sync             ",
+        "| Next Sync             ",
+        "| Default Payload              ",
+        "| Default Filters                          ",
+        "| Default Page Size ",
+        "| Process Status ",
+        "| Status  ",
+    )
+
+    headers = "".join(columns)
+    typer.secho(headers, fg=typer.colors.BLUE, bold=True)
+    typer.secho("-" * len(headers), fg=typer.colors.BLUE)
+    def _column_len(column_val):
+        if column_val is None:
+            return 0
+        elif isinstance(column_val, int):
+            return len(str(column_val))
+        else:
+            return len(column_val)
+    ##
+
+    ##
+
+    for app_id in applications:
+        name, short_name, host, url_scheme, auth_type, auth_data, dump_path, sync_frequency, last_sync, next_sync, default_payload, default_filters, default_page_size, process_status, status = applications[app_id].values()
+
+        typer.secho(
+            f"{app_id}{(len(columns[0]) - _column_len(str(app_id))) * ' '}"
+            f"| {name}{(len(columns[1]) - _column_len(name)-2) * ' '}"
+            f"| {short_name}{(len(columns[2]) - _column_len(short_name)-2) * ' '}"
+            f"| {host}{(len(columns[3]) - _column_len(host)-2) * ' '}"
+            f"| {url_scheme}{(len(columns[4]) - _column_len(url_scheme)-2) * ' '}"
+            f"| {auth_type}{(len(columns[5]) - _column_len(auth_type)-2) * ' '}"
+            f"| {auth_data}{(len(columns[6]) - _column_len(auth_data)-4) * ' '}"
+            f"| {dump_path}{(len(columns[7]) - _column_len(dump_path)-2) * ' '}"
+            f"| {sync_frequency}{(len(columns[8]) - _column_len(sync_frequency)-2) * ' '}"
+            f"| {last_sync}{(len(columns[9]) - _column_len(last_sync)-6) * ' '}"
+            f"| {next_sync}{(len(columns[10]) - _column_len(next_sync)-6) * ' '}"
+            f"| {default_payload}{(len(columns[11]) - _column_len(default_payload)-4) * ' '}"
+            f"| {default_filters}{(len(columns[12]) - _column_len(default_filters)-4) * ' '}"
+            f"| {default_page_size}{(len(columns[13]) - _column_len(default_page_size)-2) * ' '}"
+            f"| {process_status}{(len(columns[14]) - _column_len(process_status)-2) * ' '}"
+            f"| {status}",
+            fg=typer.colors.BLUE,
+        )
+
+    typer.secho("-" * len(headers) + "\n", fg=typer.colors.BLUE)
+
+@app.command(name="list-apps")
+def list_applications() -> None:
+    #--
+    applications = get_applications()
+    application_list = applications.get_applications()
+    cli_render_application(application_list)
+
+@app.command(name="get-app")
+def get_app(app_id: str = typer.Argument(..., help="ID of the application")) -> None:
+    #--
+    applications = get_applications()
+    application_result = applications.get_app_by_id(app_id)
+    application = application_result.application
+    error = application_result.error
+    if error:
+        typer.secho(
+            f'Getting application # "{app_id}" failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    else:
+       cli_render_application({app_id:application})
+
+@app.command(name="get-app-by-name")
+def get_app_by_name(name: str = typer.Argument(..., help="Name of the application")) -> None:
+    #--
+    applications = get_applications()
+    application_result = applications.get_app_by_name(name)
+    application = application_result.application
+    error = application_result.error
+    if error:
+        typer.secho(
+            f'Getting application # "{name}" failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    else:
+       cli_render_application(application)
+
+@app.command(name="get-app-by-short-name")
+def get_app_by_short_name(short_name: str = typer.Argument(..., help="Short name of the application")) -> None:
+    #--
+    applications = get_applications()
+    application_result = applications.get_app_by_short_name(short_name)
+    application = application_result.application
+    error = application_result.error
+    if error:
+        typer.secho(
+            f'Getting application # "{short_name}" failed with "{ERRORS[error]}"',
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    else:
+       cli_render_application(application)
+
+@app.command(name="get-app-by-status")
+def get_app_by_status(status: int = typer.Argument(..., help="Status of the application to filter")) -> None:
+    #--
+    applications = get_applications()
+    application_list = applications.get_app_by_status(status)
+    cli_render_application(application_list)
+
+@app.command(name="get-app-by-process-status")
+def get_app_by_process_status(process_status: int = typer.Argument(..., help="Process Status of the application to filter")) -> None:
+    #--
+    applications = get_applications()
+    application_list = applications.get_app_by_process_status(process_status)
+    cli_render_application(application_list)
+
+@app.command("update-app-status")
+def update_app_status(
+    app_id: str = typer.Argument(..., help="ID of the app to update"),
+    status: int = typer.Option(1, "--status", "-s", min=0, max=1, help="App status (0=>disabled, 1=>enabled)"),
+) -> None:
+    #--
+    ##
+
+
+    applications = get_applications()
+    application_result = applications.update_app_status(app_id, status)
+    error = application_result.error
+    status_txt = "enabled" if status == 1 else "disabled"
+
+    if error:
+        typer.secho(
+            f'updating application # {app_id} failed with status: "{status_txt}"',
+            fg=typer.colors.RED,
+        )
+        logging.error(f'updating application # {app_id} failed with status: "{status_txt}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(
+            f"""Application # {app_id} updated successfully with status: "{status_txt}" """,
+            fg=typer.colors.GREEN,
+        )
+        logging.info(f"""Application # {app_id} updated successfully with status: "{status_txt}" """)
+
+@app.command("update-app-process-status")
+def update_app_process_status(
+    app_id: str = typer.Argument(..., help="ID of the app to update"),
+    process_status: int = typer.Option(1, "--process-status", "-prs", min=0, max=2, help="App process status (0=>not processed, 1=>inprocess, or 2=>processed)"),
+) -> None:
+    #--
+    ##
+
+
+    applications = get_applications()
+    application_result = applications.update_app_process_status(app_id, process_status)
+    error = application_result.error
+
+    if error:
+        typer.secho(
+            f'updating application # {app_id} failed with status: "{process_status}"',
+            fg=typer.colors.RED,
+        )
+        logging.error(f'updating application # {app_id} failed with status: "{process_status}"')
+        raise typer.Exit(1)
+    else:
+        typer.secho(
+            f"""Application # {app_id} updated successfully with status: "{process_status}" """,
+            fg=typer.colors.GREEN,
+        )
+        logging.info(f"""Application # {app_id} updated successfully with status: "{process_status}" """)
+
+@app.command("remove-app")
+def remove_app(
+    app_id: str = typer.Argument(...),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force deletion without confirmation.",
+    ),
+) -> None:
+    #--
+    applications = get_applications()
+
+    def _remove():
+        application_result = applications.remove(app_id)
+        error = application_result.error
+        if error:
+            typer.secho(
+                f'Removing application # {app_id} failed with "{ERRORS[error]}"',
+                fg=typer.colors.RED,
+            )
+            logging.error( f'Removing application # {app_id} failed with "{ERRORS[error]}"')
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                f"""Application # {app_id} was removed""",
+                fg=typer.colors.GREEN,
+            )
+            logging.info(f"""Application # {app_id} was removed""")
+
+    if force:
+        _remove()
+    else:
+        try:
+            application_result = applications.get_app_by_id(app_id)
+            application = application_result.application
+            error = application_result.error
+            if error:
+                typer.secho("Invalid APP_ID", fg=typer.colors.RED)
+                raise typer.Exit(1)
+        except IndexError:
+            typer.secho("Invalid APP_ID", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        delete = typer.confirm(
+            f"Delete application # {app_id} with name : {application['name']}?"
+        )
+        if delete:
+            _remove()
+        else:
+            typer.echo("Operation canceled")
+
+@app.command(name="clear-apps")
+def remove_all_apps(
+    force: bool = typer.Option(
+        ...,
+        prompt="Delete all applications?",
+        help="Force deletion without confirmation.",
+    ),
+) -> None:
+    #--
+    applications = get_applications()
+    if force:
+        error = applications.remove_all().error
+        if error:
+            typer.secho(
+                f'Removing applications failed with "{ERRORS[error]}"',
+                fg=typer.colors.RED,
+            )
+            logging.error(f'Removing applications failed with "{ERRORS[error]}"')
+            raise typer.Exit(1)
+        else:
+            typer.secho("All applications were removed", fg=typer.colors.GREEN)
+            logging.info("All applications were removed")
+    else:
+        typer.echo("Operation canceled")
+
+@app.command("generate-fake")
+def generate_fake(
+    app_count: int = typer.Option(
+        10,
+        "--apps",
+        "-a",
+        prompt="App Count :",
+        help="Number of fake apps you want to generate.",
+    ),
+    endpoints_in_app: int = typer.Option(
+        10,
+        "--endpoints",
+        "-e",
+        prompt="Enpoints Count in each App :",
+        help="Number of fake endpoints you want to generate in each app.",
+    ),
+) -> None:
+    #--
+    try:
+        logging.info(f"Generating Random data for Apps: {app_count} and {endpoints_in_app} endpoints in each app.")
+        random_data.generate_random_data(app_count, endpoints_in_app)
+    except Exception as err:
+        logging.error(f'\nEncountered error in random data generation: {str(err)}\n')
+        typer.secho(
+            f'\nEncountered error in random data generation: {str(err)}\n',
+            fg=typer.colors.BRIGHT_RED,
+        )
+    else:
+        logging.info(f"Random Application Data and endpoint data generated successfully!")
+        typer.secho(
+            '\nRandom Application Data and endpoint data generated successfully! \n',
+            fg=typer.colors.BRIGHT_YELLOW,
+        )
+
+@app.command("run-fake-server")
+def run_fake_server() -> None:
+    #--
+    raw_api.run_fake_api()
+
+@app.command("test-scheduler")
+def test_scheduler() -> None:
+    #--
+    scheduler_service = SchedulerService()
+    scheduler_service.main()
+
+def _version_callback(value: bool) -> None:
+    #--
+    if value:
+        typer.echo(f"{__app_name__} v{__version__}")
+        raise typer.Exit()
+    
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        help="Show the application's version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    )
+) -> None:
+    #--
+    return version
+

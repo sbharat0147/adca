@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>autonomous_data_collection_agent.database &#8212; Autonomous Data Collector Agent 1.0.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=039e1c02" />
+    <script src="../../_static/documentation_options.js?v=2ab8bd80"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for autonomous_data_collection_agent.database</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;This module provides the Autonomous Data Collector  Agent database functionality.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">configparser</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">pysondb</span> <span class="kn">import</span> <span class="n">PysonDB</span>
+<span class="kn">from</span> <span class="nn">pysondb</span> <span class="kn">import</span> <span class="n">errors</span> <span class="k">as</span> <span class="n">pysonErrors</span>
+<span class="kn">import</span> <span class="nn">typer</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="n">DB_READ_ERROR</span><span class="p">,</span> <span class="n">DB_WRITE_ERROR</span><span class="p">,</span> <span class="n">JSON_ERROR</span><span class="p">,</span> <span class="n">SUCCESS</span><span class="p">,</span> <span class="n">__app_name__</span>
+
+<span class="c1"># The code is creating file paths for two JSON database files: `database_endpoint.json` and</span>
+<span class="c1"># `database_application.json`.</span>
+<span class="n">ENDPOINT_DB_FILE_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="n">__app_name__</span><span class="p">,</span> <span class="s2">&quot;database_endpoint.json&quot;</span><span class="p">)</span>
+<span class="n">APP_DB_FILE_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="n">__app_name__</span><span class="p">,</span> <span class="s2">&quot;database_application.json&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="get_database_path">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.get_database_path">[docs]</a>
+<span class="k">def</span> <span class="nf">get_database_path</span><span class="p">(</span><span class="n">config_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">item_type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `get_database_path` returns the current path to the database based on the provided</span>
+<span class="sd">    config file and item type.</span>
+<span class="sd">    </span>
+<span class="sd">    :param config_file: The `config_file` parameter is a string that represents the path to the</span>
+<span class="sd">    configuration file. This file contains information about the application&#39;s settings, including the</span>
+<span class="sd">    path to the database</span>
+<span class="sd">    :type config_file: str</span>
+<span class="sd">    :param item_type: The `item_type` parameter is a string that represents the type of item for which</span>
+<span class="sd">    you want to retrieve the database path</span>
+<span class="sd">    :return: the current path to the database as a string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;General&quot;</span><span class="p">][</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item_type</span><span class="si">}</span><span class="s2">_database&quot;</span><span class="p">])</span></div>
+
+
+
+<div class="viewcode-block" id="init_database">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.init_database">[docs]</a>
+<span class="k">def</span> <span class="nf">init_database</span><span class="p">(</span><span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `init_database` creates a new database by writing an empty JSON object to a specified</span>
+<span class="sd">    file path.</span>
+<span class="sd">    </span>
+<span class="sd">    :param db_path: The `db_path` parameter is a string that represents the path to the database file</span>
+<span class="sd">    :type db_path: str</span>
+<span class="sd">    :return: an integer value. The possible return values are:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span>
+            <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="s2">&quot;keys&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{}</span>
+        <span class="p">},</span> <span class="n">file</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">SUCCESS</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span></div>
+
+
+<span class="c1"># The `DBResponse` class represents a response from a database query, containing a list of items and</span>
+<span class="c1"># an error code.</span>
+<div class="viewcode-block" id="DBResponse">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DBResponse">[docs]</a>
+<span class="k">class</span> <span class="nc">DBResponse</span><span class="p">:</span>
+    <span class="n">item_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span>
+    <span class="n">error</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item_list</span><span class="p">,</span> <span class="n">error</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">item_list</span> <span class="o">=</span> <span class="n">item_list</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span> <span class="o">=</span> <span class="n">error</span></div>
+
+
+<span class="c1"># The `DatabaseHandler` class provides methods for interacting with a database, including adding,</span>
+<span class="c1"># retrieving, updating, and deleting items.</span>
+<div class="viewcode-block" id="DatabaseHandler">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler">[docs]</a>
+<span class="k">class</span> <span class="nc">DatabaseHandler</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function initializes an instance of a class with a given database path.</span>
+<span class="sd">        </span>
+<span class="sd">        :param db_path: The `db_path` parameter is a string that represents the path to the database</span>
+<span class="sd">        file. It is used to initialize the `self._db_path` attribute of the class. This attribute stores</span>
+<span class="sd">        the path to the database file, which will be used to create an instance of the `PysonDB`</span>
+<span class="sd">        :type db_path: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db_path</span> <span class="o">=</span> <span class="n">db_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">PysonDB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_path</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="DatabaseHandler.add_item">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.add_item">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `add_item` adds an item to a database and returns the ID of the added item.</span>
+<span class="sd">        </span>
+<span class="sd">        :param item: The `item` parameter is a dictionary that represents the item to be added to the</span>
+<span class="sd">        database</span>
+<span class="sd">        :type item: dict</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># returns id of the item</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">item</span><span class="p">)],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_WRITE_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DatabaseHandler.get_by_id">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.get_by_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_by_id` retrieves a record from a database based on its ID and returns a</span>
+<span class="sd">        `DBResponse` object.</span>
+<span class="sd">        </span>
+<span class="sd">        :param id: The `id` parameter is an integer that represents the unique identifier of the item</span>
+<span class="sd">        you want to retrieve from the database</span>
+<span class="sd">        :type id: int</span>
+<span class="sd">        :return: The code is returning a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="nb">id</span><span class="p">)],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="DatabaseHandler.get_by_query">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.get_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_by_query` retrieves data from a database based on a query string and returns a</span>
+<span class="sd">        `DBResponse` object.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query_str: The `query_str` parameter is a string that represents a query to be executed</span>
+<span class="sd">        on the database. It can be a lambda expression that filters the data based on certain</span>
+<span class="sd">        conditions. For example, `lambda x: x[&#39;name&#39;] == &#39;abi&#39;` filters the data where the value of the</span>
+<span class="sd">        &#39;</span>
+<span class="sd">        :type query_str: str</span>
+<span class="sd">        :return: The code is returning a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># example query lambda x: x[&#39;name&#39;] == &#39;abi&#39; or lambda x: x[&#39;knows_python&#39;] is False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">query_str</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span> 
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="DatabaseHandler.get_by_column">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.get_by_column">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_by_column</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">column_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">column_value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_by_column` retrieves data from a database based on a specified column name and</span>
+<span class="sd">        value.</span>
+<span class="sd">        </span>
+<span class="sd">        :param column_name: The `column_name` parameter is a string that represents the name of the</span>
+<span class="sd">        column in the database table that you want to query</span>
+<span class="sd">        :type column_name: str</span>
+<span class="sd">        :param column_value: The `column_value` parameter is the value that you want to match in the</span>
+<span class="sd">        specified column. It is used in the query to filter the results and retrieve the rows where the</span>
+<span class="sd">        value in the specified column matches the `column_value`</span>
+<span class="sd">        :type column_value: str</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># example query lambda x: x[&#39;name&#39;] == &#39;abi&#39; or lambda x: x[&#39;knows_python&#39;] is False</span>
+    
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span>  <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="n">column_name</span><span class="p">]</span> <span class="o">==</span> <span class="n">column_value</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span> 
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+        
+<div class="viewcode-block" id="DatabaseHandler.read_items">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.read_items">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_items</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function reads items from a database and returns a response object.</span>
+<span class="sd">        :return: The code is returning a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_all</span><span class="p">(),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DatabaseHandler.update_by_id">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.update_by_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates a record in a database by its ID and returns a DBResponse object.</span>
+<span class="sd">        </span>
+<span class="sd">        :param id: The `id` parameter is an integer that represents the unique identifier of the data</span>
+<span class="sd">        entry that needs to be updated in the database</span>
+<span class="sd">        :type id: int</span>
+<span class="sd">        :param data: The `data` parameter is a dictionary that contains the updated values for the</span>
+<span class="sd">        record with the specified `id`</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">id</span><span class="p">),</span> <span class="n">data</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="DatabaseHandler.update_by_query">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.update_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `update_by_query` updates data in a database based on a query string and returns a</span>
+<span class="sd">        response.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query_str: The `query_str` parameter is a string that represents a query condition. It</span>
+<span class="sd">        can be a lambda function that takes a dictionary as input and returns a boolean value. The</span>
+<span class="sd">        lambda function is used to filter the data in the database based on certain conditions</span>
+<span class="sd">        :type query_str: str</span>
+<span class="sd">        :param data: The `data` parameter is a dictionary that contains the updated values for the</span>
+<span class="sd">        fields in the database. It is used to specify the new values that should be applied to the</span>
+<span class="sd">        documents that match the query</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+         <span class="c1"># example query lambda x: x[&#39;name&#39;] == &#39;abi&#39; or lambda x: x[&#39;knows_python&#39;] is False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">update_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="p">,</span> <span class="n">new_data</span><span class="o">=</span><span class="n">data</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DatabaseHandler.delete_by_id">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.delete_by_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">delete_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `delete_by_id` deletes a record from the database based on the given ID and returns</span>
+<span class="sd">        a DBResponse object indicating the success or failure of the operation.</span>
+<span class="sd">        </span>
+<span class="sd">        :param id: The `id` parameter is an integer that represents the unique identifier of the item to</span>
+<span class="sd">        be deleted from the database</span>
+<span class="sd">        :type id: int</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">delete_by_id</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="DatabaseHandler.delete_by_query">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.delete_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">delete_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `delete_by_query` deletes records from a database based on a given query string and</span>
+<span class="sd">        returns a response indicating the success or failure of the operation.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query_str: The `query_str` parameter is a string that represents a query used to filter</span>
+<span class="sd">        and select specific data in the database. It can be a lambda expression that defines the</span>
+<span class="sd">        conditions for deleting data. For example, `lambda x: x[&#39;name&#39;] == &#39;abi&#39;` would delete all</span>
+<span class="sd">        records where the</span>
+<span class="sd">        :type query_str: str</span>
+<span class="sd">        :return: The function `delete_by_query` returns a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+         <span class="c1"># example query lambda x: x[&#39;name&#39;] == &#39;abi&#39; or lambda x: x[&#39;knows_python&#39;] is False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span>  <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">delete_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DatabaseHandler.write_items">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.write_items">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_items</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function writes a list of items to a database and returns a response indicating success or</span>
+<span class="sd">        failure.</span>
+<span class="sd">        </span>
+<span class="sd">        :param item_list: The `item_list` parameter is a list of dictionaries. Each dictionary</span>
+<span class="sd">        represents an item and contains key-value pairs representing the item&#39;s attributes</span>
+<span class="sd">        :type item_list: list[dict]</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># test = &#39;[{&quot;column_name&quot;:&quot;created_at&quot;, &quot;operator&quot;:&quot;&lt;&quot;, &quot;column_value&quot;:&quot;15-03-1988 10:58:15&quot;}]&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">item_list_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">add_many</span><span class="p">(</span><span class="n">item_list</span><span class="p">,</span> <span class="n">json_response</span><span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="n">item_list_ids</span><span class="p">,</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="n">item_list</span><span class="p">,</span> <span class="n">DB_WRITE_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="DatabaseHandler.purge">
+<a class="viewcode-back" href="../../old/autonomous_data_collection_agent.html#autonomous_data_collection_agent.database.DatabaseHandler.purge">[docs]</a>
+    <span class="k">def</span> <span class="nf">purge</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The `purge` function purges the database and returns a `DBResponse` object with an empty list</span>
+<span class="sd">        and a success status, or an error status if there is a file IO problem or an ID does not exist</span>
+<span class="sd">        error.</span>
+<span class="sd">        :return: a `DBResponse` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">purge</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+</div>
+
+
+<span class="c1"># python -m autonomous_data_collection_agent update-app 331280544566123098 -df &quot;[{\&quot;column_name\&quot;:\&quot;CREATED_AT\&quot;,\&quot;operator\&quot;:\&quot;=\&quot;,\&quot;column_value\&quot;:\&quot;15-03-1988 10:58:15\&quot;},{\&quot;column_name\&quot;:\&quot;UPDATED_AT\&quot;,\&quot;operator\&quot;:\&quot;=\&quot;, \&quot;column_value\&quot;:\&quot;15-03-1988 10:58:15\&quot;}]&quot;</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Autonomous Data Collector Agent</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.html">autonomous_data_collection_agent package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.tests.html">autonomous_data_collection_agent.tests package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Sgt Jai Singh.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

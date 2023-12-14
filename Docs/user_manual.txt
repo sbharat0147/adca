@@ -1,0 +1,131 @@
+# User Manual for the Autonomous Data Collection Agent
+
+## Introduction
+
+The Autonomous Data Collection Agent is a Python-based software tool designed for collecting data from various applications at scheduled intervals. It interacts with application APIs to fetch data while handling authentication, filtering, ordering, pagination, and maintaining a record of data collection processes.
+
+### System Requirements
+
+- Python 3.x installed
+- Windows environment for the SchedulerService
+- Access to application APIs with proper authentication credentials
+- Database for storing application and endpoint configurations
+
+### Features
+
+- Data collection from multiple applications and endpoints
+- Dynamic request building with filtering, attributes, and pagination
+- API authentication handling, including KeyCloak integration
+- Scheduling service for automated data collection
+- Encrypted file storage for security
+- CLI for easy management
+
+## Setup & Installation
+
+1. **Install Python**: Ensure Python 3.x is installed on your system.
+2. **Clone the Repository**: Clone or download the Autonomous Data Collection Agent repository to your local machine.
+3. **Install Dependencies**: Navigate to the directory and install required Python packages using `pip install -r requirements.txt`.
+4. **Configure the Application**: Run the configuration scripts provided in `config.py` to set up database paths, logging, KeyCloak authentication, threading, and encryption settings.
+
+## Getting Started
+
+### Initializing the Database
+
+Before starting the data collection process, initialize the database by running:
+
+```bash
+python autonomousagent.py init
+```
+
+This will set up the necessary database structure for storing application and endpoint configurations.
+
+### Configuring Applications and Endpoints
+
+1. **Add an Application**: Define an application that the agent will collect data from using:
+
+   ```bash
+   python cli.py add_application --name "App Name" --short_name "AppShort" --other-params
+   ```
+
+2. **Add an Endpoint**: Specify an endpoint within the application to collect data from:
+
+   ```bash
+   python cli.py add_endpoint --app_id 1 --name "EndpointName" --other-params
+   ```
+
+### Scheduling Data Collection
+
+Use the SchedulerService in `scheduler.py` to automate data collection tasks:
+
+1. **Service Installation**: Install the SchedulerService to run in the background:
+
+   ```bash
+   python scheduler.py install
+   ```
+
+2. **Service Start**: Start the service with:
+
+   ```bash
+   python scheduler.py start
+   ```
+
+### Encrypting Data
+
+For enhanced security, enable encryption using the CLI:
+
+```bash
+python cli.py enable_encryption --is-enabled true
+```
+
+## Using the CLI
+
+The CLI offers commands for managing data collection tasks, which include:
+
+- `get_endpoints`: Retrieves list of endpoints
+- `get_applications`: Retrieves list of applications
+- `add_endpoint`: Adds a new endpoint
+- `list_endpoints`: Lists all endpoints
+- `update_endpoint`: Updates an existing endpoint
+- `remove_endpoint`: Removes an endpoint
+- `add_application`: Adds a new application
+- `list_applications`: Lists all applications
+- `update_application`: Updates an existing application
+- `remove_application`: Removes an application
+- `enable_threading`: Toggles threading for concurrent processing
+- `set_concurrent_threads`: Sets the number of concurrent threads
+- `enable_encryption`: Toggles file encryption
+- `reset_encryption_key`: Resets the encryption key
+- `check_encryption`: Checks the current encryption status
+
+To use any command, navigate to the CLI script's directory and run:
+
+```bash
+python cli.py <command> [options]
+```
+
+For example, to enable threading:
+
+```bash
+python cli.py enable_threading --is-enabled true
+```
+
+### Help and Documentation
+
+For a detailed explanation of any CLI command, use the `--help` option:
+
+```bash
+python cli.py <command> --help
+```
+
+## Troubleshooting & Support
+
+- **Log Files**: Check the log files created by the SchedulerService for errors or issues.
+- **Configuration Files**: Ensure all configuration files are set up correctly and paths are defined.
+- **Database Access**: Verify that the Autonomous Data Collection Agent has access to its databases.
+- **API Credentials**: Confirm that API credentials and KeyCloak configurations are correct.
+
+For further assistance, refer to the inline documentation within the script files or contact the software support team.
+
+## Conclusion
+
+The Autonomous Data Collection Agent is a powerful tool for automating the process of collecting data from various applications. By following this user manual, you can configure, manage, and schedule data collection tasks efficiently and securely.

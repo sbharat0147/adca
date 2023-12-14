@@ -1,0 +1,13 @@
+[Unit]
+Description=A script for scraping the book information
+After=syslog.target network.target
+
+[Service]
+WorkingDirectory=/home/oxylabs/Scraper
+ExecStart=/home/oxylabs/Scraper/venv/bin/python3 scrape.py
+
+Restart=always
+RestartSec=120
+
+[Install]
+WantedBy=multi-user.target

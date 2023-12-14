@@ -1,0 +1,159 @@
+# Autonomous Data Collector Agent Installation/Setup/Deployment Manual
+
+## Introduction
+This manual outlines the steps required to install, setup, and deploy the Autonomous Data Collector Agent, a Python-based application designed for automated data collection from various endpoints. Follow the instructions carefully to ensure successful deployment.
+
+### Prerequisites
+- Python 3.x installed on the system.
+- Access to command-line interface (CLI) or terminal.
+- Necessary permissions to install software and services on the system.
+- Network access to the endpoints from which data will be collected.
+- KeyCloak server (if KeyCloak authentication is used).
+
+## Installation Steps
+
+### 1. Download the Application
+Clone the repository or download the package containing the Autonomous Data Collector Agent to your local machine.
+
+### 2. Setup Python Environment
+It is recommended to create a virtual environment for the application.
+
+```bash
+python -m venv adc_venv
+```
+
+Activate the virtual environment:
+
+- On Windows:
+```bash
+adc_venv\Scripts\activate
+```
+
+- On macOS and Linux:
+```bash
+source adc_venv/bin/activate
+```
+
+### 3. Install Dependencies
+Navigate to the application directory and install the required dependencies using `pip`:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure the Application
+Run the `config.py` script to initialize and configure the Autonomous Data Collector Agent.
+
+```bash
+python config.py --init
+```
+
+The `--init` flag will guide you through creating necessary configurations such as database paths, log files, KeyCloak integration, and encryption setup.
+
+### 5. Database Initialization
+Execute the `database.py` script to set up the initial database structure.
+
+```bash
+python database.py --setup
+```
+
+This will create and initialize the databases required for the application's operation.
+
+### 6. Service Setup (Windows only)
+For Windows systems, use the `scheduler.py` to install the Scheduler Service.
+
+```bash
+python scheduler.py install
+```
+
+After installation, start the service:
+
+```bash
+python scheduler.py start
+```
+
+### 7. File Encryption Setup (Optional)
+If file encryption is required, use `fileencryption.py` to set up file encryption.
+
+```bash
+python fileencryption.py --init
+```
+
+Follow the prompts to enable and configure file encryption.
+
+### 8. CLI Tool Configuration
+Configure the CLI tool, `cli.py`, with the necessary database paths and service configurations:
+
+```bash
+python cli.py init
+```
+
+## Deployment Steps
+
+### 1. Endpoint Configuration
+Use the CLI tool to add and configure the endpoints.
+
+```bash
+python cli.py add_endpoint --name "Endpoint Name" --url_endpoint "http://api.endpoint.url" --method GET
+```
+
+### 2. Application Configuration
+Similarly, add applications that the endpoints belong to:
+
+```bash
+python cli.py add_application --name "Application Name" --short_name "AppShortName" --host "application.host"
+```
+
+### 3. Schedule Data Collection
+Configure the schedule for data collection by setting up cron jobs or similar schedulers, depending on your system, to run the `autonomousagent.py` script at your desired frequency.
+
+For example, using cron on a Unix-like system:
+
+```bash
+crontab -e
+```
+
+Add a cron job:
+
+```bash
+*/30 * * * * /path/to/adc_venv/bin/python /path/to/autonomousagent.py
+```
+
+This example runs the data collection every 30 minutes.
+
+### 4. Starting the Agent
+Execute the main script to start data collection:
+
+```bash
+python autonomousagent.py
+```
+
+## Post-Deployment
+
+### Verifying the Installation
+Check the logs to ensure that the Autonomous Data Collector Agent is running correctly and that data is being collected as scheduled.
+
+### Monitoring
+Regularly monitor the application's logs for any errors or warnings.
+
+### Updating Configuration
+Use the CLI tool to update endpoint or application configurations as needed.
+
+### Handling Encryption Keys
+If encryption is enabled, manage encryption keys securely and ensure they are backed up and accessible for future use or in case of system migration.
+
+### Service Management (Windows only)
+Manage the Windows service using the `scheduler.py` script to stop, start, or restart the service as required.
+
+## Troubleshooting
+In case of issues:
+- Ensure all prerequisites are met.
+- Verify that Python and all dependencies are correctly installed.
+- Check the configuration settings for any incorrect parameters.
+- Review log files for detailed error messages.
+
+For further assistance, consult the application's help documentation or contact the support team.
+
+---
+
+Please ensure that you adjust the above steps as necessary to fit the specifics of your environment and the Autonomous Data Collector Agent's latest updates or specific configurations.

@@ -1,0 +1,52 @@
+Request Sample:
+
+Method: POST/GET
+Endpoint: /data-export-generic-api
+Authentication: BasicAuth/Token (KeyCloak)
+Data Type: JSON
+
+Request : {
+table_name: $table_name,
+filters: [
+{
+    column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),
+    operator: (> | < | = | >= | <= | != | <> ),
+    column_value: DD-MM-YYYY hh:mm:ss
+},
+{
+    column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),
+    operator: (> | < | = | >= | <= | != | <> ),
+    column_value: DD-MM-YYYY hh:mm:ss
+}
+],
+page_size: $number,
+page_number: $number,
+order_by: [
+{
+column_name: $column_name,
+order: $order (ASC | DESC) 
+},
+{
+column_name: $column_name,
+order: $order (ASC | DESC) 
+}
+]
+}
+
+and the response success object should look like:
+{
+table_name: $table_name,
+response_time: DD-MM-YYYY hh:mm:ss,
+data: [{}],
+total: $total_records,
+page_size: $number,
+page_number: $number
+}
+
+failure sample: 
+{
+table_name: $table_name,
+response_time: DD-MM-YYYY hh:mm:ss,
+error_code: $error_code,
+error_message:  $error_message
+}

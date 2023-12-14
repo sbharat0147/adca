@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>database.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>database.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>This module provides the Autonomous Data Collector  Agent database functionality.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">configparser</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">pysondb</span> <span class="kn">import</span> <span class="n">PysonDB</span>
+<span class="kn">from</span> <span class="nn">pysondb</span> <span class="kn">import</span> <span class="n">errors</span> <span class="k">as</span> <span class="n">pysonErrors</span>
+<span class="kn">import</span> <span class="nn">typer</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="n">DB_READ_ERROR</span><span class="p">,</span> <span class="n">DB_WRITE_ERROR</span><span class="p">,</span> <span class="n">JSON_ERROR</span><span class="p">,</span> <span class="n">SUCCESS</span><span class="p">,</span> <span class="n">__app_name__</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>The code is creating file paths for two JSON database files: <code>database_endpoint.json</code> and
+<code>database_application.json</code>.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">ENDPOINT_DB_FILE_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="n">__app_name__</span><span class="p">,</span> <span class="s2">&quot;database_endpoint.json&quot;</span><span class="p">)</span>
+<span class="n">APP_DB_FILE_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="n">__app_name__</span><span class="p">,</span> <span class="s2">&quot;database_application.json&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>The function <code>get_database_path</code> returns the current path to the database based on the provided
+config file and item type.</p>
+<p>:param config_file: The <code>config_file</code> parameter is a string that represents the path to the
+configuration file. This file contains information about the application&rsquo;s settings, including the
+path to the database
+:type config_file: str
+:param item_type: The <code>item_type</code> parameter is a string that represents the type of item for which
+you want to retrieve the database path
+:return: the current path to the database as a string.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">get_database_path</span><span class="p">(</span><span class="n">config_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">item_type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">config_parser</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="n">config_parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">config_parser</span><span class="p">[</span><span class="s2">&quot;General&quot;</span><span class="p">][</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item_type</span><span class="si">}</span><span class="s2">_database&quot;</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>The function <code>init_database</code> creates a new database by writing an empty JSON object to a specified
+file path.</p>
+<p>:param db_path: The <code>db_path</code> parameter is a string that represents the path to the database file
+:type db_path: str
+:return: an integer value. The possible return values are:</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">init_database</span><span class="p">(</span><span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span>
+            <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="s2">&quot;keys&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{}</span>
+        <span class="p">},</span> <span class="n">file</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">SUCCESS</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DB_WRITE_ERROR</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>The <code>DBResponse</code> class represents a response from a database query, containing a list of items and
+an error code.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">DBResponse</span><span class="p">:</span>
+    <span class="n">item_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span>
+    <span class="n">error</span><span class="p">:</span> <span class="nb">int</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item_list</span><span class="p">,</span> <span class="n">error</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">item_list</span> <span class="o">=</span> <span class="n">item_list</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span> <span class="o">=</span> <span class="n">error</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>The <code>DatabaseHandler</code> class provides methods for interacting with a database, including adding,
+retrieving, updating, and deleting items.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">DatabaseHandler</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>The function initializes an instance of a class with a given database path.</p>
+<p>:param db_path: The <code>db_path</code> parameter is a string that represents the path to the database
+file. It is used to initialize the <code>self._db_path</code> attribute of the class. This attribute stores
+the path to the database file, which will be used to create an instance of the <code>PysonDB</code>
+:type db_path: str</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">_db_path</span> <span class="o">=</span> <span class="n">db_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">PysonDB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_path</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>The function <code>add_item</code> adds an item to a database and returns the ID of the added item.</p>
+<p>:param item: The <code>item</code> parameter is a dictionary that represents the item to be added to the
+database
+:type item: dict
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">add_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>returns id of the item</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">item</span><span class="p">)],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_WRITE_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>The function <code>get_by_id</code> retrieves a record from a database based on its ID and returns a
+<code>DBResponse</code> object.</p>
+<p>:param id: The <code>id</code> parameter is an integer that represents the unique identifier of the item
+you want to retrieve from the database
+:type id: int
+:return: The code is returning a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="nb">id</span><span class="p">)],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>The function <code>get_by_query</code> retrieves data from a database based on a query string and returns a
+<code>DBResponse</code> object.</p>
+<p>:param query_str: The <code>query_str</code> parameter is a string that represents a query to be executed
+on the database. It can be a lambda expression that filters the data based on certain
+conditions. For example, <code>lambda x: x['name'] == 'abi'</code> filters the data where the value of the
+&rsquo;
+:type query_str: str
+:return: The code is returning a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>example query lambda x: x[&lsquo;name&rsquo;] == &lsquo;abi&rsquo; or lambda x: x[&lsquo;knows_python&rsquo;] is False</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="n">query_str</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span> 
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>The function <code>get_by_column</code> retrieves data from a database based on a specified column name and
+value.</p>
+<p>:param column_name: The <code>column_name</code> parameter is a string that represents the name of the
+column in the database table that you want to query
+:type column_name: str
+:param column_value: The <code>column_value</code> parameter is the value that you want to match in the
+specified column. It is used in the query to filter the results and retrieve the rows where the
+value in the specified column matches the <code>column_value</code>
+:type column_value: str
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_by_column</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">column_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">column_value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>example query lambda x: x[&lsquo;name&rsquo;] == &lsquo;abi&rsquo; or lambda x: x[&lsquo;knows_python&rsquo;] is False</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span>  <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="n">column_name</span><span class="p">]</span> <span class="o">==</span> <span class="n">column_value</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span> 
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>The function reads items from a database and returns a response object.
+:return: The code is returning a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">read_items</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_all</span><span class="p">(),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <p>The function updates a record in a database by its ID and returns a DBResponse object.</p>
+<p>:param id: The <code>id</code> parameter is an integer that represents the unique identifier of the data
+entry that needs to be updated in the database
+:type id: int
+:param data: The <code>data</code> parameter is a dictionary that contains the updated values for the
+record with the specified <code>id</code>
+:type data: dict
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">update_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">id</span><span class="p">),</span> <span class="n">data</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>The function <code>update_by_query</code> updates data in a database based on a query string and returns a
+response.</p>
+<p>:param query_str: The <code>query_str</code> parameter is a string that represents a query condition. It
+can be a lambda function that takes a dictionary as input and returns a boolean value. The
+lambda function is used to filter the data in the database based on certain conditions
+:type query_str: str
+:param data: The <code>data</code> parameter is a dictionary that contains the updated values for the
+fields in the database. It is used to specify the new values that should be applied to the
+documents that match the query
+:type data: dict
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">update_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>example query lambda x: x[&lsquo;name&rsquo;] == &lsquo;abi&rsquo; or lambda x: x[&lsquo;knows_python&rsquo;] is False</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">update_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="p">,</span> <span class="n">new_data</span><span class="o">=</span><span class="n">data</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>The function <code>delete_by_id</code> deletes a record from the database based on the given ID and returns
+a DBResponse object indicating the success or failure of the operation.</p>
+<p>:param id: The <code>id</code> parameter is an integer that represents the unique identifier of the item to
+be deleted from the database
+:type id: int
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">delete_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">delete_by_id</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>The function <code>delete_by_query</code> deletes records from a database based on a given query string and
+returns a response indicating the success or failure of the operation.</p>
+<p>:param query_str: The <code>query_str</code> parameter is a string that represents a query used to filter
+and select specific data in the database. It can be a lambda expression that defines the
+conditions for deleting data. For example, <code>lambda x: x['name'] == 'abi'</code> would delete all
+records where the
+:type query_str: str
+:return: The function <code>delete_by_query</code> returns a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">delete_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>example query lambda x: x[&lsquo;name&rsquo;] == &lsquo;abi&rsquo; or lambda x: x[&lsquo;knows_python&rsquo;] is False</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span>  <span class="n">DBResponse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">delete_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="p">),</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>The function writes a list of items to a database and returns a response indicating success or
+failure.</p>
+<p>:param item_list: The <code>item_list</code> parameter is a list of dictionaries. Each dictionary
+represents an item and contains key-value pairs representing the item&rsquo;s attributes
+:type item_list: list[dict]
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">write_items</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>test = &lsquo;[{&ldquo;column_name&rdquo;:&rdquo;created_at&rdquo;, &ldquo;operator&rdquo;:&rdquo;&lt;&rdquo;, &ldquo;column_value&rdquo;:&rdquo;15-03-1988 10:58:15&rdquo;}]&rsquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="n">item_list_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">add_many</span><span class="p">(</span><span class="n">item_list</span><span class="p">,</span> <span class="n">json_response</span><span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="n">item_list_ids</span><span class="p">,</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">(</span><span class="n">item_list</span><span class="p">,</span> <span class="n">DB_WRITE_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>The <code>purge</code> function purges the database and returns a <code>DBResponse</code> object with an empty list
+and a success status, or an error status if there is a file IO problem or an ID does not exist
+error.
+:return: a <code>DBResponse</code> object.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">purge</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DBResponse</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">purge</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">SUCCESS</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>  <span class="c1"># Catch file IO problems</span>
+            <span class="k">return</span> <span class="n">DBResponse</span><span class="p">([],</span> <span class="n">DB_READ_ERROR</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">pysonErrors</span><span class="o">.</span><span class="n">IdDoesNotExistError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ID Not found/mismatch Error: </span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>python -m autonomous_data_collection_agent update-app 331280544566123098 -df &ldquo;[{"column_name":"CREATED_AT","operator":"=","column_value":"15-03-1988 10:58:15"},{"column_name":"UPDATED_AT","operator":"=", "column_value":"15-03-1988 10:58:15"}]&rdquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

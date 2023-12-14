@@ -1,0 +1,40 @@
+Let's break down the functionality and features of `fileencryption.py` based on the provided code comments:
+
+1. **Initialization and Configuration:**
+   - `FileEncryption` class provides methods for encrypting and decrypting files using the Fernet encryption algorithm.
+   - The function initializes a class instance by reading a configuration file and setting encryption key and encryption-enabled properties.
+
+2. **Encryption Status Checking:**
+   - `is_encryption_enabled`: Checks if encryption is enabled by comparing the value of the `_encryption_enabled` attribute to the string "True".
+   - `is_encryption_enabled_v2`: Checks if encryption is enabled by verifying the availability of an encryption key.
+
+3. **File Encryption:**
+   - `encrypt_and_save_content`: Encrypts the given file content using a provided encryption key and saves it to the specified file path.
+     - Parameters: `file_content` (content to encrypt), `file_path` (destination file path).
+     - Returns: the file path where the encrypted content is saved.
+
+   - `encrypt_original_file`: Encrypts a file using the Fernet encryption algorithm and saves the encrypted data back to the original file.
+     - Parameters: `file_path` (path to the file to encrypt).
+     - Returns: the file path of the encrypted file.
+
+   - `encrypt_file`: Encrypts the contents of the source file using a provided encryption key and writes the encrypted data to the destination file.
+     - Parameters: `source_file_path` (path to the source file), `destination_file_path` (path where the encrypted file will be saved).
+     - Returns: the destination file path.
+
+4. **File Decryption:**
+   - `decrypt_and_save_content`: Decrypts the file content using a provided encryption key and saves the decrypted content to the specified file path.
+     - Parameters: `file_content` (content to decrypt), `file_path` (destination file path).
+     - Returns: the file path where the decrypted content is saved.
+
+   - `decrypt_original_file`: Decrypts a file using the Fernet encryption algorithm and overwrites the original file with the decrypted data.
+     - Parameters: `file_path` (path to the file to decrypt).
+     - Returns: the file path of the decrypted file.
+
+   - `decrypt_file`: Decrypts the source file and writes the decrypted data to the destination file if encryption is enabled.
+     - Parameters: `source_file_path` (path to the source file), `destination_file_path` (path where the decrypted file will be saved).
+     - Returns: the destination file path.
+
+5. **Examples and Usage:**
+   - The code includes examples of encrypting and decrypting files, opening files in write mode, and writing encrypted or decrypted data.
+
+In summary, `fileencryption.py` provides a class for file encryption and decryption using the Fernet encryption algorithm, with methods for checking encryption status, encrypting and decrypting file content, and performing these operations on files.

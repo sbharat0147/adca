@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>autonomous_data_collection_agent.autonomousagent &#8212; Autonomous Data Collector Agent 1.0.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=039e1c02" />
+    <script src="../../_static/documentation_options.js?v=2ab8bd80"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for autonomous_data_collection_agent.autonomousagent</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;This module provides the Autonomous Data Collector Agent model-controller.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="c1"># The above code is importing the `os` module in Python.</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">typer</span>
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="n">config</span><span class="p">,</span> <span class="n">APP_NOT_FOUND</span><span class="p">,</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">,</span> <span class="n">DUPLICATE_RECORD</span>
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent.database</span> <span class="kn">import</span> <span class="n">DatabaseHandler</span><span class="p">,</span> <span class="n">get_database_path</span>
+<span class="kn">import</span> <span class="nn">logging</span>  <span class="c1"># Import the logging module</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">getLogFilePath</span><span class="p">(),</span> <span class="n">filemode</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">datefmt</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%b-%y %H:%M:%S&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+<span class="c1"># The `CurrentEndpoint` class represents an endpoint with its associated error code.</span>
+<div class="viewcode-block" id="CurrentEndpoint">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.CurrentEndpoint">[docs]</a>
+<span class="k">class</span> <span class="nc">CurrentEndpoint</span><span class="p">:</span>
+    <span class="n">endpoint</span><span class="p">:</span> <span class="nb">dict</span>
+    <span class="n">error</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span> <span class="n">error</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">endpoint</span> <span class="o">=</span> <span class="n">endpoint</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span> <span class="o">=</span> <span class="n">error</span></div>
+
+    <span class="c1"># Endpoint Object Structure:</span>
+    <span class="c1"># </span>
+    <span class="c1"># endpoint : {</span>
+    <span class="c1"># The above code is a comment in Python. It starts with a hash symbol (#) which indicates that it</span>
+    <span class="c1"># is a single-line comment. It is used to provide explanatory notes or documentation within the</span>
+    <span class="c1"># code. In this case, it appears to be documenting the purpose or description of a variable named</span>
+    <span class="c1"># &quot;id&quot; which is expected to be an integer.</span>
+    <span class="c1">#     id: int,</span>
+    <span class="c1">#     app_id: str,</span>
+    <span class="c1">#     name: str,</span>
+    <span class="c1">#     url_endpoint: str,</span>
+    <span class="c1">#     method: (GET | POST),</span>
+    <span class="c1">#     payload: {table_name: str, ...},</span>
+    <span class="c1">#     filters: {</span>
+    <span class="c1">#         column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),</span>
+    <span class="c1">#         operator: (&gt; | &lt; | = | &gt;= | &lt;= | != | &lt;&gt; ),</span>
+    <span class="c1">#         column_value: DD-MM-YYYY hh:mm:ss</span>
+    <span class="c1">#     },</span>
+    <span class="c1">#     page_size: int,</span>
+    <span class="c1">#     last_sync: date_time,</span>
+    <span class="c1">#     process_status: 0 | 1 | 2</span>
+    <span class="c1">#     failed_count: 0 </span>
+    <span class="c1">#     failed_time: DD-MM-YYYY hh:mm:ss</span>
+    <span class="c1">#     status: 0 | 1</span>
+    <span class="c1"># }</span>
+
+<span class="c1"># The class &quot;CurrentApplication&quot; represents a current application with its attributes &quot;application&quot;</span>
+<span class="c1"># and &quot;error&quot;.</span>
+<div class="viewcode-block" id="CurrentApplication">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.CurrentApplication">[docs]</a>
+<span class="k">class</span> <span class="nc">CurrentApplication</span><span class="p">:</span>
+    <span class="n">application</span><span class="p">:</span> <span class="nb">dict</span>
+    <span class="n">error</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">application</span><span class="p">,</span> <span class="n">error</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">application</span> <span class="o">=</span> <span class="n">application</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span> <span class="o">=</span> <span class="n">error</span></div>
+
+    
+    <span class="c1"># Application Object Structure</span>
+    <span class="c1"># </span>
+    <span class="c1"># application: {</span>
+    <span class="c1">#     id: int,</span>
+    <span class="c1">#     name: str,</span>
+    <span class="c1">#     short_name: str,</span>
+    <span class="c1">#     host: str,</span>
+    <span class="c1">#     url_scheme: str (http| https),</span>
+    <span class="c1">#     auth_type: str (None | KEYCLOAK | BASIC),</span>
+    <span class="c1">#     auth_data: {},</span>
+    <span class="c1">#     dump_path: str,</span>
+    <span class="c1">#     sync_frequency: str (cronjob),</span>
+    <span class="c1">#     last_sync: date_time,</span>
+    <span class="c1">#     next_sync: date_time,</span>
+    <span class="c1">#     default_payload: {},</span>
+    <span class="c1">#     default_filters: [{</span>
+    <span class="c1">#         column_name: str (CREATED_AT | UPDATED_AT | DELETED_AT),</span>
+    <span class="c1">#         operator: (&gt; | &lt; | = | &gt;= | &lt;= | != | &lt;&gt; ),</span>
+    <span class="c1">#         column_value: DD-MM-YYYY hh:mm:ss</span>
+    <span class="c1">#     }],</span>
+    <span class="c1">#     default_page_size: int,</span>
+    <span class="c1">#     process_status: 0 | 1 | 2</span>
+    <span class="c1"># }</span>
+
+
+<span class="c1"># The `Endpoints` class provides methods for managing and manipulating endpoint data in a database.</span>
+<div class="viewcode-block" id="Endpoints">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints">[docs]</a>
+<span class="k">class</span> <span class="nc">Endpoints</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function initializes an instance of a class with a database handler object.</span>
+<span class="sd">        </span>
+<span class="sd">        :param db_path: The `db_path` parameter is a string that represents the path to the database</span>
+<span class="sd">        file. It is used to initialize the `DatabaseHandler` object, which will handle all the</span>
+<span class="sd">        interactions with the database</span>
+<span class="sd">        :type db_path: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="Endpoints.validate_endpoint_data">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.validate_endpoint_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate_endpoint_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `validate_endpoint_data` validates the data dictionary for a specific endpoint,</span>
+<span class="sd">        ensuring that the values are of the correct types.</span>
+<span class="sd">        </span>
+<span class="sd">        :param data: The `data` parameter is a dictionary that contains information about an endpoint.</span>
+<span class="sd">        It is used to validate the data types of the values in the dictionary. The dictionary should</span>
+<span class="sd">        have the following keys:</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: a boolean value of True.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint name must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;app_id&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;app_id&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint app id must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url_endpoint&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;url_endpoint&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint url must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint method must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint payload must be of type string or dict&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span> 
+                    <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                            <span class="s2">&quot;Endpoint payload must be valid JSON string of single object&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                        <span class="p">)</span>
+                        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint payload must be valid JSON string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">],</span> <span class="nb">list</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint filters must be of type string or list&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span> 
+                    <span class="n">filters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">filters</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                            <span class="s2">&quot;Endpoint filters must be valid JSON string of list of objects&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                        <span class="p">)</span>
+                        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint filters must be valid JSON string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">],</span> <span class="n">datetime</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint last sync must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint page_size must be of type integer&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>    
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;process_status&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;process_status&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint process_status must be of type integer&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> 
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;Endpoint status must be of type integer&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.add">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.add">[docs]</a>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">url_endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">filters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">page_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">last_sync</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">process_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function adds a new endpoint to the database with the provided parameters.</span>
+<span class="sd">        </span>
+<span class="sd">        :param name: The name of the endpoint to be added to the database. It should be a string</span>
+<span class="sd">        :type name: str</span>
+<span class="sd">        :param app_short_name: The `app_short_name` parameter is a string that represents the short name</span>
+<span class="sd">        of the application to which the endpoint belongs</span>
+<span class="sd">        :type app_short_name: str</span>
+<span class="sd">        :param url_endpoint: The `url_endpoint` parameter is a string that represents the URL endpoint</span>
+<span class="sd">        of the API. It is the address where the API can be accessed</span>
+<span class="sd">        :type url_endpoint: str</span>
+<span class="sd">        :param method: The &quot;method&quot; parameter specifies the HTTP method to be used for the endpoint. It</span>
+<span class="sd">        can have two possible values: &quot;GET&quot; or &quot;POST&quot;</span>
+<span class="sd">        :type method: str</span>
+<span class="sd">        :param payload: The `payload` parameter is a dictionary that represents the data to be sent in</span>
+<span class="sd">        the request body when making a POST request to the specified `url_endpoint`. It contains</span>
+<span class="sd">        key-value pairs where the keys represent the field names and the values represent the</span>
+<span class="sd">        corresponding values to be sent</span>
+<span class="sd">        :type payload: dict</span>
+<span class="sd">        :param filters: The `filters` parameter is a list of dictionaries. Each dictionary represents a</span>
+<span class="sd">        filter condition for the endpoint. Each dictionary should have the following keys:</span>
+<span class="sd">        :type filters: list[dict]</span>
+<span class="sd">        :param page_size: The `page_size` parameter is an integer that specifies the number of records</span>
+<span class="sd">        to be returned per page when retrieving data from the endpoint</span>
+<span class="sd">        :type page_size: int</span>
+<span class="sd">        :param last_sync: The parameter &quot;last_sync&quot; is of type datetime. It represents the date and time</span>
+<span class="sd">        of the last synchronization for the endpoint</span>
+<span class="sd">        :type last_sync: datetime</span>
+<span class="sd">        :param process_status: The parameter &quot;process_status&quot; represents the status of the endpoint&#39;s</span>
+<span class="sd">        processing. It can have three possible values:</span>
+<span class="sd">        :type process_status: int</span>
+<span class="sd">        :param status: The &quot;status&quot; parameter is an integer that represents the status of the endpoint.</span>
+<span class="sd">        It can have the following values:</span>
+<span class="sd">        :type status: int</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class, which contains the endpoint data and an</span>
+<span class="sd">        error code.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">filters</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="n">filters</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">filters</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        
+        <span class="k">assert</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="s2">&quot;POST&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid method. Only &#39;GET&#39; and &#39;POST&#39; are allowed.&quot;</span>
+        <span class="k">assert</span> <span class="n">process_status</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;Invalid process status. Only 0, 1 and 2 are allowed.&quot;</span>
+        <span class="k">for</span> <span class="nb">filter</span> <span class="ow">in</span> <span class="n">filters</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">filter</span><span class="p">[</span><span class="s1">&#39;column_name&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;CREATED_AT&quot;</span><span class="p">,</span> <span class="s2">&quot;UPDATED_AT&quot;</span><span class="p">,</span> <span class="s2">&quot;DELETED_AT&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid column name. Only &#39;CREATED_AT&#39;, &#39;UPDATED_AT&#39; and &#39;DELETED_AT&#39; are allowed.&quot;</span>
+            <span class="k">assert</span> <span class="nb">filter</span><span class="p">[</span><span class="s1">&#39;operator&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">,</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">,</span> <span class="s2">&quot;!=&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;&gt;&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid operator. Only &#39;&gt;&#39;, &#39;&lt;&#39;, &#39;=&#39;, &#39;&gt;=&#39;, &#39;&lt;=&#39;, &#39;!=&#39;, &#39;&lt;&gt;&#39; are allowed.&quot;</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="nb">filter</span><span class="p">[</span><span class="s1">&#39;column_value&#39;</span><span class="p">],</span> <span class="s1">&#39;</span><span class="si">%d</span><span class="s1">-%m-%Y %H:%M:%S&#39;</span><span class="p">)</span>  <span class="c1"># This will raise a ValueError if the date format is incorrect</span>
+
+        <span class="n">app_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">app_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">app_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">)</span><span class="o">.</span><span class="n">item_list</span><span class="p">)))</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">app_id</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+    
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;app_id&quot;</span><span class="p">:</span> <span class="n">app_id</span><span class="p">,</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s2">&quot;url_endpoint&quot;</span><span class="p">:</span> <span class="n">url_endpoint</span><span class="p">,</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
+            <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">payload</span><span class="p">,</span>
+            <span class="s2">&quot;filters&quot;</span><span class="p">:</span> <span class="n">filters</span><span class="p">,</span>
+            <span class="s2">&quot;page_size&quot;</span><span class="p">:</span> <span class="n">page_size</span><span class="p">,</span>
+            <span class="s2">&quot;last_sync&quot;</span><span class="p">:</span> <span class="n">last_sync</span><span class="p">,</span>
+            <span class="s2">&quot;process_status&quot;</span><span class="p">:</span> <span class="n">process_status</span><span class="p">,</span>
+            <span class="s2">&quot;failed_count&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;failed_time&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">status</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate_endpoint_data</span><span class="p">(</span><span class="n">endpoint</span><span class="p">)</span>
+
+        <span class="n">duplicate_endpoint_name_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app_endpoint_by_name</span><span class="p">(</span><span class="n">app_id</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> 
+
+        <span class="k">if</span> <span class="n">duplicate_endpoint_name_obj</span><span class="o">.</span><span class="n">endpoint</span> <span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">DUPLICATE_RECORD</span><span class="p">)</span>
+        
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">endpoint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span><span class="n">endpoint</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+            
+
+<div class="viewcode-block" id="Endpoints.get_endpoint_list">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_endpoint_list">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_endpoint_list</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_endpoint_list` returns the current endpoint list by reading items from the</span>
+<span class="sd">        database handler.</span>
+<span class="sd">        :return: the item list from the database handler.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">read_items</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_endpoint_by_id">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_endpoint_by_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_endpoint_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ENDPOINT_ID</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_endpoint_by_id` returns the endpoint with the specified ID.</span>
+<span class="sd">        </span>
+<span class="sd">        :param ENDPOINT_ID: The `ENDPOINT_ID` parameter is a string that represents the unique</span>
+<span class="sd">        identifier of the endpoint you want to retrieve</span>
+<span class="sd">        :type ENDPOINT_ID: str</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span></div>
+
+        
+<div class="viewcode-block" id="Endpoints.get_endpoint_by_name">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_endpoint_by_name">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_endpoint_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_endpoint_by_name` returns the endpoint with a given name.</span>
+<span class="sd">        </span>
+<span class="sd">        :param name: The `name` parameter is a string that represents the name of the endpoint that you</span>
+<span class="sd">        want to retrieve</span>
+<span class="sd">        :type name: str</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_app_endpoint_by_name">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_app_endpoint_by_name">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_endpoint_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_endpoint_by_name` returns the endpoint with a specific name for a given</span>
+<span class="sd">        app ID.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_id: The `app_id` parameter is a string that represents the ID of the application. It</span>
+<span class="sd">        is used to filter the endpoints based on the specified application ID</span>
+<span class="sd">        :type app_id: str</span>
+<span class="sd">        :param name: The `name` parameter is a string that represents the name of the endpoint you want</span>
+<span class="sd">        to retrieve</span>
+<span class="sd">        :type name: str</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_endpoint_by_url">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_endpoint_by_url">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_endpoint_by_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url_endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_endpoint_by_url` returns the endpoint by name based on the provided URL</span>
+<span class="sd">        endpoint.</span>
+<span class="sd">        </span>
+<span class="sd">        :param url_endpoint: The `url_endpoint` parameter is a string that represents the URL endpoint.</span>
+<span class="sd">        It is used to search for an endpoint in the database</span>
+<span class="sd">        :type url_endpoint: str</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;url_endpoint&#39;</span><span class="p">,</span> <span class="n">url_endpoint</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_endpoints_by_query">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_endpoints_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_endpoints_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_endpoints_by_query` returns a list of endpoints filtered by a custom query.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query: A string representing the custom query to filter the endpoint list</span>
+<span class="sd">        :type query: str</span>
+<span class="sd">        :return: a list of dictionaries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="o">=</span><span class="n">query</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_app_endpoints">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_app_endpoints">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_endpoints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_endpoints` returns the current endpoint list for a given application short</span>
+<span class="sd">        name.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_short_name: The `app_short_name` parameter is a string that represents the short name</span>
+<span class="sd">        of an application</span>
+<span class="sd">        :type app_short_name: str</span>
+<span class="sd">        :return: a list of dictionaries, which represents the current endpoint list for the specified</span>
+<span class="sd">        application.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">app_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">app_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">app_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">)</span><span class="o">.</span><span class="n">item_list</span><span class="p">)))</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">app_id</span><span class="p">:</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;app_id&#39;</span><span class="p">,</span> <span class="n">app_id</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_app_endpoints_by_process_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_app_endpoints_by_process_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_endpoints_by_process_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">process_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_endpoints_by_process_status` returns the current endpoint list for a given</span>
+<span class="sd">        application filtered by process status.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_short_name: The `app_short_name` parameter is a string that represents the short name</span>
+<span class="sd">        of the application. It is used to filter the application by its short name</span>
+<span class="sd">        :type app_short_name: str</span>
+<span class="sd">        :param process_status: The `process_status` parameter is an integer that represents the status</span>
+<span class="sd">        of a process. It is used to filter the endpoint list for a specific application based on the</span>
+<span class="sd">        process status</span>
+<span class="sd">        :type process_status: int</span>
+<span class="sd">        :return: a list of dictionaries that represent the current endpoint list for an application</span>
+<span class="sd">        filtered by process status.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">app_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">))</span>
+        <span class="n">all_apps</span> <span class="o">=</span> <span class="n">app_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">)</span><span class="o">.</span><span class="n">item_list</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">all_apps</span><span class="p">:</span>
+                <span class="n">app_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">app_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">)</span><span class="o">.</span><span class="n">item_list</span><span class="p">)))</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">app_id</span><span class="p">:</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">process_status</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.get_app_endpoints_by_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.get_app_endpoints_by_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_endpoints_by_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_endpoints_by_status` returns the current endpoint list for an application</span>
+<span class="sd">        filtered by status.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_short_name: The `app_short_name` parameter is a string that represents the short name</span>
+<span class="sd">        of an application. It is used to identify the application in the database</span>
+<span class="sd">        :type app_short_name: str</span>
+<span class="sd">        :param status: The &quot;status&quot; parameter is an integer that represents the status of the</span>
+<span class="sd">        application. It is used to filter the endpoint list for the application based on the specified</span>
+<span class="sd">        status</span>
+<span class="sd">        :type status: int</span>
+<span class="sd">        :return: a list of dictionaries that represent the current endpoint list for an application</span>
+<span class="sd">        filtered by status.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">app_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">app_id</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">app_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">)</span><span class="o">.</span><span class="n">item_list</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">app_id</span><span class="p">:</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">status</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.update_endpoint">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.update_endpoint">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_endpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ENDPOINT_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates an endpoint with the provided data and returns the updated endpoint along</span>
+<span class="sd">        with any errors encountered.</span>
+<span class="sd">        </span>
+<span class="sd">        :param ENDPOINT_ID: The `ENDPOINT_ID` parameter is an integer that represents the unique</span>
+<span class="sd">        identifier of the endpoint that needs to be updated</span>
+<span class="sd">        :type ENDPOINT_ID: int</span>
+<span class="sd">        :param data: The `data` parameter is a dictionary that contains the updated information for the</span>
+<span class="sd">        endpoint</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class. The `CurrentEndpoint` object contains the</span>
+<span class="sd">        updated endpoint data and any error that occurred during the update process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">endpoint</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span>
+        
+        <span class="n">endpoint</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate_endpoint_data</span><span class="p">(</span><span class="n">endpoint</span><span class="p">)</span>
+
+        <span class="n">duplicate_endpoint_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app_endpoint_by_name</span><span class="p">(</span><span class="n">endpoint</span><span class="p">[</span><span class="s2">&quot;app_id&quot;</span><span class="p">],</span> <span class="n">endpoint</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span> 
+
+        <span class="k">if</span> <span class="n">duplicate_endpoint_obj</span><span class="o">.</span><span class="n">endpoint</span> <span class="ow">and</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">duplicate_endpoint_obj</span><span class="o">.</span><span class="n">endpoint</span><span class="p">))</span> <span class="o">!=</span> <span class="n">ENDPOINT_ID</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">DUPLICATE_RECORD</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">endpoint</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="n">datetime</span><span class="p">:</span>
+           <span class="n">endpoint</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">endpoint</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">])</span>
+
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">endpoint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span><span class="n">endpoint</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.update_endpoint_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.update_endpoint_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_endpoint_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ENDPOINT_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates the status of an endpoint in a database and returns the updated endpoint</span>
+<span class="sd">        along with any error that occurred during the update.</span>
+<span class="sd">        </span>
+<span class="sd">        :param ENDPOINT_ID: The `ENDPOINT_ID` parameter is an integer that represents the unique</span>
+<span class="sd">        identifier of the endpoint that needs to be updated</span>
+<span class="sd">        :type ENDPOINT_ID: int</span>
+<span class="sd">        :param status: The &quot;status&quot; parameter is an integer that represents the updated status of the</span>
+<span class="sd">        endpoint</span>
+<span class="sd">        :type status: int</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class. The `CurrentEndpoint` object contains the</span>
+<span class="sd">        updated endpoint information and any error that occurred during the update process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+       
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">endpoint</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span>
+        <span class="n">endpoint</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="n">status</span><span class="p">})</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="n">status</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span><span class="n">endpoint</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.update_endpoint_process_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.update_endpoint_process_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_endpoint_process_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ENDPOINT_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">process_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates the process status of an endpoint in a database.</span>
+<span class="sd">        </span>
+<span class="sd">        :param ENDPOINT_ID: The ENDPOINT_ID parameter is an integer that represents the unique</span>
+<span class="sd">        identifier of the endpoint that needs to be updated</span>
+<span class="sd">        :type ENDPOINT_ID: int</span>
+<span class="sd">        :param process_status: The `process_status` parameter is an integer that represents the status</span>
+<span class="sd">        of a process associated with an endpoint</span>
+<span class="sd">        :type process_status: int</span>
+<span class="sd">        :return: an instance of the `CurrentEndpoint` class. The `CurrentEndpoint` object contains the</span>
+<span class="sd">        updated endpoint data and any error that occurred during the update process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">endpoint</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">ENDPOINT_NOT_FOUND</span><span class="p">)</span>
+        <span class="n">endpoint</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="n">process_status</span><span class="p">})</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="n">process_status</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span><span class="n">endpoint</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.update_endpoints_by_query">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.update_endpoints_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_endpoints_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `update_endpoints_by_query` updates endpoints based on a query string and returns</span>
+<span class="sd">        the updated endpoints.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query_str: The query string used to filter the endpoints that need to be updated. It is a</span>
+<span class="sd">        string representation of a lambda function that takes a dictionary as input and returns a</span>
+<span class="sd">        boolean value. The lambda function is used to define the conditions for updating the endpoints</span>
+<span class="sd">        :type query_str: str</span>
+<span class="sd">        :param data: A dictionary containing the updated values for the endpoints</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: a list of updated endpoints.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># query_str = lambda x: x[&#39;app_id&#39;] == app_id and x[&#39;process_status&#39;] == status</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="o">=</span><span class="n">query_str</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+    
+        <span class="k">return</span> <span class="n">write</span><span class="o">.</span><span class="n">item_list</span></div>
+
+
+<div class="viewcode-block" id="Endpoints.remove">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ENDPOINT_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function removes an endpoint from the database using its id or index and returns the result.</span>
+<span class="sd">        </span>
+<span class="sd">        :param ENDPOINT_ID: The `ENDPOINT_ID` parameter is an integer that represents the id or index of</span>
+<span class="sd">        the endpoint that you want to remove from the database</span>
+<span class="sd">        :type ENDPOINT_ID: int</span>
+<span class="sd">        :return: The method is returning an instance of the `CurrentEndpoint` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">delete_by_id</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span><span class="n">ENDPOINT_ID</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Endpoints.remove_all">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.remove_all">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentEndpoint</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function removes all endpoints from the database.</span>
+<span class="sd">        :return: The method `remove_all` returns a `CurrentEndpoint` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">purge</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Endpoints.remove_all_by_app">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Endpoints.remove_all_by_app">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_all_by_app</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function removes all endpoints of a specific application from the database.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_short_name: The `app_short_name` parameter is a string that represents the short name</span>
+<span class="sd">        of an application</span>
+<span class="sd">        :type app_short_name: str</span>
+<span class="sd">        :return: a `CurrentEndpoint` object. The `CurrentEndpoint` object contains two attributes:</span>
+<span class="sd">        `item_list` and `error`. The `item_list` attribute contains the list of deleted endpoints, and</span>
+<span class="sd">        the `error` attribute contains any error message that occurred during the deletion process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">app_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">app_id</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">app_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">app_short_name</span><span class="p">)</span><span class="o">.</span><span class="n">item_list</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">delete_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">({},</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentEndpoint</span><span class="p">(</span><span class="n">write</span><span class="o">.</span><span class="n">item_list</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+</div>
+
+
+<span class="c1"># The `Applications` class is a Python class that provides methods for managing applications in a</span>
+<span class="c1"># database, including adding, retrieving, updating, and deleting applications.</span>
+<div class="viewcode-block" id="Applications">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications">[docs]</a>
+<span class="k">class</span> <span class="nc">Applications</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function initializes an instance of a class with a database handler object.</span>
+<span class="sd">        </span>
+<span class="sd">        :param db_path: The `db_path` parameter is a string that represents the path to the database</span>
+<span class="sd">        file. It is used to initialize the `DatabaseHandler` object, which will handle all the</span>
+<span class="sd">        interactions with the database</span>
+<span class="sd">        :type db_path: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span> <span class="o">=</span> <span class="n">DatabaseHandler</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span>
+    
+<div class="viewcode-block" id="Applications.is_valid_cronjob">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.is_valid_cronjob">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_valid_cronjob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sync_frequency</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function checks if a given sync frequency string matches the format of a cron job.</span>
+<span class="sd">        </span>
+<span class="sd">        :param sync_frequency: The `sync_frequency` parameter is a string that represents the frequency</span>
+<span class="sd">        at which a cron job should run. It should be in the format of a cron expression, which consists</span>
+<span class="sd">        of five space-separated fields representing the minute, hour, day of the month, month, and day</span>
+<span class="sd">        of the week</span>
+<span class="sd">        :return: The function is_valid_cronjob returns either the sync_frequency if it matches the</span>
+<span class="sd">        cron_regex pattern, or False if it does not match the pattern. If sync_frequency is None, the</span>
+<span class="sd">        function returns None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Regular expression to match the cron job format</span>
+        <span class="c1"># @todo implement it with python-crontab module</span>
+
+        <span class="n">cron_regex</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;^\S+\s+\S+\s+\S+\s+\S+\s+\S+$&#39;</span>
+
+        <span class="k">if</span> <span class="n">sync_frequency</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">cron_regex</span><span class="p">,</span> <span class="n">sync_frequency</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">sync_frequency</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span></div>
+
+        
+<div class="viewcode-block" id="Applications.check_and_create_directory">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.check_and_create_directory">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_and_create_directory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function checks if a directory exists and creates it if it doesn&#39;t.</span>
+<span class="sd">        </span>
+<span class="sd">        :param path: The `path` parameter is a string that represents the directory path that needs to</span>
+<span class="sd">        be checked and created if it does not exist</span>
+<span class="sd">        :return: the path of the directory if it is successfully created or if it already exists. If</span>
+<span class="sd">        there is an error creating the directory, it returns a string indicating the error. If the path</span>
+<span class="sd">        is None, it returns None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="c1"># Check if the directory exists</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="c1"># Directory does not exist, try to create it</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">path</span>  <span class="c1"># No error, directory created successfully</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">path</span>  <span class="c1"># Directory already exists, no error</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Error creating directory: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+        
+<div class="viewcode-block" id="Applications.validate_app_data">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.validate_app_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate_app_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `validate_app_data` validates the data dictionary for a specific set of keys and</span>
+<span class="sd">        their corresponding value types.</span>
+<span class="sd">        </span>
+<span class="sd">        :param data: The `data` parameter is a dictionary that contains various attributes of an app.</span>
+<span class="sd">        Each attribute is checked for its type and validity in the `validate_app_data` method</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: a boolean value of True.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App name must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;short_name&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;short_name&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App short name must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;host&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;host&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App host must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url_scheme&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;url_scheme&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App URL Scheme must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_type&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_type&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App Auth Type must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App Auth Data must be of type string or dict&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span> 
+                    <span class="n">auth_data</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">auth_data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                            <span class="s2">&quot;App Auth Data must be valid JSON string of single object&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                        <span class="p">)</span>
+                        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App Auth Data must be valid JSON string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;dump_path&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;dump_path&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App dump path must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;sync_frequency&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;sync_frequency&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App sync frequency must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">]),</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">],</span> <span class="n">datetime</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App last sync must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">],</span> <span class="n">datetime</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App next sync must be of type string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App default_payload must be of type string or dict&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span> 
+                    <span class="n">default_payload</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">default_payload</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                            <span class="s2">&quot;App default_payload must be valid JSON string of single object&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                        <span class="p">)</span>
+                        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App default_payload must be valid JSON string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">],</span> <span class="nb">list</span><span class="p">)):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App default_filters must be of type string or list&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span> 
+                    <span class="n">default_filters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">default_filters</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                        <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                            <span class="s2">&quot;App default_filters must be valid JSON string of list of objects&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                        <span class="p">)</span>
+                        <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App default_filters must be valid JSON string&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                            
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_page_size&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;default_page_size&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App default_page_size must be of type integer&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>    
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;process_status&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;process_status&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App process_status must be of type integer&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> 
+        
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                    <span class="s2">&quot;App status must be of type integer&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="Applications.add">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.add">[docs]</a>
+    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">url_scheme</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">auth_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">auth_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">dump_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sync_frequency</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">last_sync</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">next_sync</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">default_payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">default_filters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">default_page_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">process_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">int</span> <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function adds a new application to the database with various parameters and performs</span>
+<span class="sd">        validation checks.</span>
+<span class="sd">        </span>
+<span class="sd">        :param name: The name of the application being added to the database. It should be a string</span>
+<span class="sd">        :type name: str</span>
+<span class="sd">        :param short_name: The `short_name` parameter is a string that represents the short name of the</span>
+<span class="sd">        application being added to the database</span>
+<span class="sd">        :type short_name: str</span>
+<span class="sd">        :param host: The `host` parameter represents the host of the application. It is a string that</span>
+<span class="sd">        specifies the hostname or IP address of the server where the application is hosted</span>
+<span class="sd">        :type host: str</span>
+<span class="sd">        :param url_scheme: The `url_scheme` parameter is a string that represents the scheme or protocol</span>
+<span class="sd">        used in the URL of the application. It can have two possible values: &quot;http&quot; or &quot;https&quot;</span>
+<span class="sd">        :type url_scheme: str</span>
+<span class="sd">        :param auth_type: The `auth_type` parameter is a string that represents the type of</span>
+<span class="sd">        authentication used by the application. It can have one of the following values: None,</span>
+<span class="sd">        &quot;KEYCLOAK&quot;, or &quot;BASIC&quot;</span>
+<span class="sd">        :type auth_type: str</span>
+<span class="sd">        :param auth_data: The `auth_data` parameter is a dictionary that contains authentication data</span>
+<span class="sd">        for the application. It is used to store information required for authentication, such as API</span>
+<span class="sd">        keys, tokens, or credentials</span>
+<span class="sd">        :type auth_data: dict</span>
+<span class="sd">        :param dump_path: The `dump_path` parameter is a string that represents the path where the</span>
+<span class="sd">        application data will be dumped or stored</span>
+<span class="sd">        :type dump_path: str</span>
+<span class="sd">        :param sync_frequency: The `sync_frequency` parameter is a string that represents the frequency</span>
+<span class="sd">        at which the application should be synchronized. It is typically specified using the cron job</span>
+<span class="sd">        format, which allows for specifying specific intervals or patterns for synchronization</span>
+<span class="sd">        :type sync_frequency: str</span>
+<span class="sd">        :param last_sync: The parameter &quot;last_sync&quot; is of type datetime and represents the date and time</span>
+<span class="sd">        of the last synchronization for the application</span>
+<span class="sd">        :type last_sync: datetime</span>
+<span class="sd">        :param next_sync: The parameter `next_sync` is a datetime object that represents the date and</span>
+<span class="sd">        time of the next synchronization for the application</span>
+<span class="sd">        :type next_sync: datetime</span>
+<span class="sd">        :param default_payload: The `default_payload` parameter is a dictionary that represents the</span>
+<span class="sd">        default payload data for the application. It contains key-value pairs where the keys represent</span>
+<span class="sd">        the field names and the values represent the default values for those fields</span>
+<span class="sd">        :type default_payload: dict</span>
+<span class="sd">        :param default_filters: The `default_filters` parameter is a list of dictionaries. Each</span>
+<span class="sd">        dictionary represents a filter that can be applied to the data. Each dictionary should have the</span>
+<span class="sd">        following keys:</span>
+<span class="sd">        :type default_filters: list[dict]</span>
+<span class="sd">        :param default_page_size: The parameter `default_page_size` is an integer that represents the</span>
+<span class="sd">        default number of items to be returned per page when making API requests</span>
+<span class="sd">        :type default_page_size: int</span>
+<span class="sd">        :param process_status: The parameter &quot;process_status&quot; is an integer that represents the status</span>
+<span class="sd">        of the application&#39;s processing. It can have one of the following values:</span>
+<span class="sd">        :type process_status: int</span>
+<span class="sd">        :param status: The &quot;status&quot; parameter is an integer that represents the status of the</span>
+<span class="sd">        application. It can have one of the following values:</span>
+<span class="sd">        :type status: int</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class, along with an error code.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">default_payload</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="n">default_payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">default_payload</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">default_filters</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+           <span class="n">default_filters</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">default_filters</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">auth_data</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+           <span class="n">auth_data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">auth_data</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="n">url_scheme</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="s2">&quot;https&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid URL scheme. Only &#39;http&#39; and &#39;https&#39; are allowed.&quot;</span>
+
+        <span class="k">assert</span> <span class="n">auth_type</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;NONE&quot;</span><span class="p">,</span> <span class="s2">&quot;KEYCLOAK&quot;</span><span class="p">,</span> <span class="s2">&quot;BASIC&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid authentication type. Only None, &#39;KEYCLOAK&#39; and &#39;BASIC&#39; are allowed.&quot;</span>
+        <span class="k">for</span> <span class="nb">filter</span> <span class="ow">in</span> <span class="n">default_filters</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">filter</span><span class="p">[</span><span class="s1">&#39;column_name&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;CREATED_AT&quot;</span><span class="p">,</span> <span class="s2">&quot;UPDATED_AT&quot;</span><span class="p">,</span> <span class="s2">&quot;DELETED_AT&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid column name. Only &#39;CREATED_AT&#39;, &#39;UPDATED_AT&#39; and &#39;DELETED_AT&#39; are allowed.&quot;</span>
+            <span class="k">assert</span> <span class="nb">filter</span><span class="p">[</span><span class="s1">&#39;operator&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">,</span> <span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">,</span> <span class="s2">&quot;!=&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;&gt;&quot;</span><span class="p">],</span> <span class="s2">&quot;Invalid operator. Only &#39;&gt;&#39;, &#39;&lt;&#39;, &#39;=&#39;, &#39;&gt;=&#39;, &#39;&lt;=&#39;, &#39;!=&#39;, &#39;&lt;&gt;&#39; are allowed.&quot;</span>
+            <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="nb">filter</span><span class="p">[</span><span class="s1">&#39;column_value&#39;</span><span class="p">],</span> <span class="s1">&#39;</span><span class="si">%d</span><span class="s1">-%m-%Y %H:%M:%S&#39;</span><span class="p">)</span>  <span class="c1"># This will raise a ValueError if the date format is incorrect</span>
+
+        <span class="k">assert</span> <span class="n">process_status</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;Invalid process status. Only 0, 1 and 2 are allowed.&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_valid_cronjob</span><span class="p">(</span><span class="n">sync_frequency</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">sync_frequency</span><span class="si">}</span><span class="s2">&#39; is not a valid cron job frequency.&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_and_create_directory</span><span class="p">(</span><span class="n">dump_path</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">dump_path</span><span class="si">}</span><span class="s2">&#39; is not a valid direcotry or couldn&#39;t be created.&quot;</span><span class="p">)</span>
+
+        <span class="n">application</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s2">&quot;short_name&quot;</span><span class="p">:</span> <span class="n">short_name</span><span class="p">,</span>
+            <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="n">host</span><span class="p">,</span>
+            <span class="s2">&quot;url_scheme&quot;</span><span class="p">:</span> <span class="n">url_scheme</span><span class="p">,</span>
+            <span class="s2">&quot;auth_type&quot;</span><span class="p">:</span> <span class="n">auth_type</span><span class="p">,</span>
+            <span class="s2">&quot;auth_data&quot;</span><span class="p">:</span> <span class="n">auth_data</span><span class="p">,</span>
+            <span class="s2">&quot;dump_path&quot;</span><span class="p">:</span> <span class="n">dump_path</span><span class="p">,</span>
+            <span class="s2">&quot;sync_frequency&quot;</span><span class="p">:</span> <span class="n">sync_frequency</span><span class="p">,</span>
+            <span class="s2">&quot;last_sync&quot;</span><span class="p">:</span> <span class="n">last_sync</span><span class="p">,</span>
+            <span class="s2">&quot;next_sync&quot;</span><span class="p">:</span> <span class="n">next_sync</span><span class="p">,</span>
+            <span class="s2">&quot;default_payload&quot;</span><span class="p">:</span> <span class="n">default_payload</span><span class="p">,</span>
+            <span class="s2">&quot;default_filters&quot;</span><span class="p">:</span> <span class="n">default_filters</span><span class="p">,</span>
+            <span class="s2">&quot;default_page_size&quot;</span><span class="p">:</span> <span class="n">default_page_size</span><span class="p">,</span>
+            <span class="s2">&quot;process_status&quot;</span><span class="p">:</span> <span class="n">process_status</span><span class="p">,</span>
+            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">status</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate_app_data</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+        <span class="n">duplicate_app_name_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app_by_name</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> 
+        <span class="n">duplicate_app_short_name_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app_by_short_name</span><span class="p">(</span><span class="n">short_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">duplicate_app_name_object</span><span class="o">.</span><span class="n">application</span> <span class="ow">or</span> <span class="n">duplicate_app_short_name_object</span><span class="o">.</span><span class="n">application</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">DUPLICATE_RECORD</span><span class="p">)</span>
+        <span class="n">app_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+        <span class="n">application</span> <span class="o">=</span> <span class="n">app_result</span><span class="o">.</span><span class="n">item_list</span>
+        <span class="n">error</span> <span class="o">=</span> <span class="n">app_result</span><span class="o">.</span><span class="n">error</span>
+        <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span><span class="n">application</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Applications.get_applications">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_applications">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_applications</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_applications` returns the current application list.</span>
+<span class="sd">        :return: a list of dictionaries, which represents the current application list.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">read_items</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span></div>
+
+
+<div class="viewcode-block" id="Applications.get_app_by_id">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_app_by_id">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">APP_ID</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_by_id` returns the endpoint of an application based on its ID.</span>
+<span class="sd">        </span>
+<span class="sd">        :param APP_ID: The `APP_ID` parameter is a string that represents the unique identifier of an</span>
+<span class="sd">        application</span>
+<span class="sd">        :type APP_ID: str</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span></div>
+
+        
+<div class="viewcode-block" id="Applications.get_app_by_name">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_app_by_name">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_by_name` returns the current application by name.</span>
+<span class="sd">        </span>
+<span class="sd">        :param name: The `name` parameter is a string that represents the name of the application you</span>
+<span class="sd">        want to retrieve</span>
+<span class="sd">        :type name: str</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Applications.get_app_by_short_name">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_app_by_short_name">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_by_short_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">short_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function returns the current application based on its short name.</span>
+<span class="sd">        </span>
+<span class="sd">        :param short_name: The `short_name` parameter is a string that represents the short name of the</span>
+<span class="sd">        application</span>
+<span class="sd">        :type short_name: str</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_column</span><span class="p">(</span><span class="s1">&#39;short_name&#39;</span><span class="p">,</span> <span class="n">short_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Applications.get_app_by_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_app_by_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_by_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_by_status` returns a list of application dictionaries filtered by a given</span>
+<span class="sd">        status.</span>
+<span class="sd">        </span>
+<span class="sd">        :param status: The `status` parameter is an integer that represents the status of the</span>
+<span class="sd">        applications. It is used to filter the application list and return only the applications that</span>
+<span class="sd">        have the specified status</span>
+<span class="sd">        :type status: int</span>
+<span class="sd">        :return: a list of dictionaries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">status</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span></div>
+
+    
+<div class="viewcode-block" id="Applications.get_app_by_query">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_app_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `get_app_by_query` returns a filtered list of applications based on a custom query.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query: The `query` parameter is a string that represents a custom query to filter the</span>
+<span class="sd">        current application list. It is used to retrieve specific applications based on certain criteria</span>
+<span class="sd">        :type query: str</span>
+<span class="sd">        :return: a list of dictionaries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># query_str = lambda x: x[&#39;id&#39;] == app_id and x[&#39;process_status&#39;] == status</span>
+        
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="o">=</span><span class="n">query</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span></div>
+
+
+<div class="viewcode-block" id="Applications.get_app_by_process_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.get_app_by_process_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_app_by_process_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">process_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function returns a list of current applications filtered by process status.</span>
+<span class="sd">        </span>
+<span class="sd">        :param process_status: The `process_status` parameter is an integer that represents the status</span>
+<span class="sd">        of the application process. It is used to filter the current application list based on this</span>
+<span class="sd">        status</span>
+<span class="sd">        :type process_status: int</span>
+<span class="sd">        :return: a list of dictionaries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+    
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">process_status</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span><span class="o">==</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span></div>
+
+    
+<div class="viewcode-block" id="Applications.update_app">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.update_app">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_app</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">APP_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates an application with the provided data and returns the updated application</span>
+<span class="sd">        along with any errors encountered.</span>
+<span class="sd">        </span>
+<span class="sd">        :param APP_ID: The APP_ID parameter is an integer that represents the ID of the application that</span>
+<span class="sd">        needs to be updated</span>
+<span class="sd">        :type APP_ID: int</span>
+<span class="sd">        :param data: The `data` parameter is a dictionary that contains the updated information for the</span>
+<span class="sd">        application. It can include any fields that need to be updated, such as the application name,</span>
+<span class="sd">        short name, default payload, default filters, and auth data</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">application</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        
+        <span class="n">application</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate_app_data</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+
+        <span class="n">duplicate_app_name_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app_by_name</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span> 
+        <span class="n">duplicate_app_short_name_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_app_by_short_name</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;short_name&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">duplicate_app_name_object</span><span class="o">.</span><span class="n">application</span> <span class="ow">and</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">duplicate_app_name_object</span><span class="o">.</span><span class="n">application</span><span class="p">))</span> <span class="o">!=</span> <span class="n">APP_ID</span><span class="p">)</span>  <span class="ow">or</span> <span class="p">(</span><span class="n">duplicate_app_short_name_object</span><span class="o">.</span><span class="n">application</span> <span class="ow">and</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">duplicate_app_short_name_object</span><span class="o">.</span><span class="n">application</span><span class="p">))</span> <span class="o">!=</span> <span class="n">APP_ID</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">DUPLICATE_RECORD</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="n">application</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+           <span class="n">application</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">])</span>
+        
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+           <span class="n">application</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="n">datetime</span><span class="p">:</span>
+           <span class="n">application</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">])</span>
+        
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">])</span> <span class="ow">is</span> <span class="n">datetime</span><span class="p">:</span>
+           <span class="n">application</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">application</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">])</span>
+
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">application</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span><span class="n">application</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Applications.update_app_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.update_app_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_app_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">APP_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates the status of an application based on the provided status value.</span>
+<span class="sd">        </span>
+<span class="sd">        :param APP_ID: The APP_ID parameter is an integer that represents the ID of the application that</span>
+<span class="sd">        needs to be updated</span>
+<span class="sd">        :type APP_ID: int</span>
+<span class="sd">        :param status: The &quot;status&quot; parameter is an integer that represents the new status of the</span>
+<span class="sd">        application</span>
+<span class="sd">        :type status: int</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class. The `CurrentApplication` object contains</span>
+<span class="sd">        the updated application information and any error that occurred during the update process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">application</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        <span class="n">application</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="n">status</span><span class="p">})</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;status&#39;</span><span class="p">:</span> <span class="n">status</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span><span class="n">application</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Applications.update_app_process_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.update_app_process_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_app_process_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">APP_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">process_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates the process status of an application in a database.</span>
+<span class="sd">        </span>
+<span class="sd">        :param APP_ID: The APP_ID parameter is an integer that represents the ID of the application that</span>
+<span class="sd">        needs to be updated</span>
+<span class="sd">        :type APP_ID: int</span>
+<span class="sd">        :param process_status: The `process_status` parameter is an integer that represents the status</span>
+<span class="sd">        of the application process</span>
+<span class="sd">        :type process_status: int</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">read</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">read</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">application</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">item_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">APP_NOT_FOUND</span><span class="p">)</span>
+        <span class="n">application</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="n">process_status</span><span class="p">})</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="n">process_status</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">(</span><span class="n">application</span><span class="p">,</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Applications.update_app_by_query">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.update_app_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_app_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates applications based on a query string and returns a list of updated items.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query_str: The query string used to filter the applications that need to be updated. It</span>
+<span class="sd">        is a string representation of a lambda function that takes an application object as input and</span>
+<span class="sd">        returns a boolean value indicating whether the application should be updated or not</span>
+<span class="sd">        :type query_str: str</span>
+<span class="sd">        :param data: A dictionary containing the updated data for the applications that match the query</span>
+<span class="sd">        :type data: dict</span>
+<span class="sd">        :return: a list of items that were updated in the database.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># query_str = lambda x: x[&#39;id&#39;] == app_id and x[&#39;process_status&#39;] == status</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">update_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="o">=</span><span class="n">query_str</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>    
+        <span class="k">return</span> <span class="n">write</span><span class="o">.</span><span class="n">item_list</span></div>
+
+    
+<div class="viewcode-block" id="Applications.delete_app_by_query">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.delete_app_by_query">[docs]</a>
+    <span class="k">def</span> <span class="nf">delete_app_by_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `delete_app_by_query` deletes applications based on a query string and returns the</span>
+<span class="sd">        list of deleted items.</span>
+<span class="sd">        </span>
+<span class="sd">        :param query_str: The query string used to filter the applications to be deleted. It is a string</span>
+<span class="sd">        that represents a condition or criteria that the applications must meet in order to be deleted</span>
+<span class="sd">        :type query_str: str</span>
+<span class="sd">        :return: a list of items that were deleted.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># query_str = lambda x: x[&#39;id&#39;] == app_id and x[&#39;process_status&#39;] == status</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">delete_by_query</span><span class="p">(</span><span class="n">query_str</span><span class="o">=</span><span class="n">query_str</span><span class="p">)</span>    
+        <span class="k">return</span> <span class="n">write</span><span class="o">.</span><span class="n">item_list</span></div>
+
+
+<div class="viewcode-block" id="Applications.remove">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">APP_ID</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The `remove` function removes an application from the database using its id or index.</span>
+<span class="sd">        </span>
+<span class="sd">        :param APP_ID: The `APP_ID` parameter is the ID or index of the application that you want to remove</span>
+<span class="sd">        from the database</span>
+<span class="sd">        :type APP_ID: int</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class, with an empty dictionary as the data and the</span>
+<span class="sd">        `error` attribute from the `write` object as the error.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">delete_by_id</span><span class="p">(</span><span class="n">APP_ID</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Applications.remove_all">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.Applications.remove_all">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CurrentApplication</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The `remove_all` function removes all applications from the database and returns the result.</span>
+<span class="sd">        :return: an instance of the `CurrentApplication` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">write</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_handler</span><span class="o">.</span><span class="n">purge</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">CurrentApplication</span><span class="p">({},</span> <span class="n">write</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="get_application_id_by_short_name">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.get_application_id_by_short_name">[docs]</a>
+<span class="k">def</span> <span class="nf">get_application_id_by_short_name</span><span class="p">(</span><span class="n">app_short_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `get_application_id_by_name` retrieves the application ID based on the given</span>
+<span class="sd">    application short name.</span>
+<span class="sd">    </span>
+<span class="sd">    :param app_short_name: The `app_short_name` parameter is a string that represents the short name of</span>
+<span class="sd">    an application</span>
+<span class="sd">    :return: the application ID associated with the given application short name.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">applications</span> <span class="o">=</span> <span class="n">Applications</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">))</span>
+    <span class="n">app_response</span> <span class="o">=</span> <span class="n">applications</span><span class="o">.</span><span class="n">get_app_by_short_name</span><span class="p">(</span><span class="n">app_short_name</span><span class="p">)</span>
+    <span class="n">application</span> <span class="o">=</span> <span class="n">app_response</span><span class="o">.</span><span class="n">application</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="n">app_response</span><span class="o">.</span><span class="n">error</span>
+
+    <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">application</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">application</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span></div>
+
+    
+<div class="viewcode-block" id="get_endpoint_id_by_name">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.autonomousagent.get_endpoint_id_by_name">[docs]</a>
+<span class="k">def</span> <span class="nf">get_endpoint_id_by_name</span><span class="p">(</span><span class="n">endpoint_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The function `get_endpoint_id_by_name` retrieves the ID of an endpoint by its name from a database.</span>
+<span class="sd">    </span>
+<span class="sd">    :param endpoint_name: The parameter `endpoint_name` is a string that represents the name of an</span>
+<span class="sd">    endpoint</span>
+<span class="sd">    :return: the ID of an endpoint based on its name.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">endpoints</span> <span class="o">=</span> <span class="n">Endpoints</span><span class="p">(</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;endpoint&#39;</span><span class="p">))</span>
+    <span class="n">endpoint_result</span> <span class="o">=</span> <span class="n">endpoints</span><span class="o">.</span><span class="n">get_endpoint_by_name</span><span class="p">(</span><span class="n">endpoint_name</span><span class="p">)</span>
+    <span class="n">endpoint</span> <span class="o">=</span> <span class="n">endpoint_result</span><span class="o">.</span><span class="n">endpoint</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="n">endpoint_result</span><span class="o">.</span><span class="n">error</span>
+    
+    <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">error</span>
+        
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">endpoint</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">endpoint</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Autonomous Data Collector Agent</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.html">autonomous_data_collection_agent package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.tests.html">autonomous_data_collection_agent.tests package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Sgt Jai Singh.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

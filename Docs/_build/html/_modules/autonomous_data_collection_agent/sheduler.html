@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>autonomous_data_collection_agent.sheduler &#8212; Autonomous Data Collector Agent 1.0.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=039e1c02" />
+    <script src="../../_static/documentation_options.js?v=2ab8bd80"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for autonomous_data_collection_agent.sheduler</h1><div class="highlight"><pre>
+<span></span><span class="c1"># The `SchedulerService` class is a Python class that represents a Windows service for scheduling and</span>
+<span class="c1"># processing data collection tasks.</span>
+
+<span class="kn">import</span> <span class="nn">win32serviceutil</span>
+<span class="kn">import</span> <span class="nn">win32service</span>
+<span class="kn">import</span> <span class="nn">win32event</span>
+<span class="kn">import</span> <span class="nn">servicemanager</span>
+<span class="kn">import</span> <span class="nn">socket</span>
+<span class="kn">from</span> <span class="nn">crontab</span> <span class="kn">import</span> <span class="n">CronTab</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">autonomous_data_collection_agent</span> <span class="kn">import</span> <span class="n">ERRORS</span><span class="p">,</span> <span class="n">__app_name__</span><span class="p">,</span> <span class="n">__version__</span><span class="p">,</span> <span class="n">autonomousagent</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">database</span><span class="p">,</span> <span class="n">fileencryption</span><span class="p">,</span> <span class="n">keycloak_auth</span>
+<span class="kn">import</span> <span class="nn">typer</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">croniter</span>
+<span class="kn">from</span> <span class="nn">requests.adapters</span> <span class="kn">import</span> <span class="n">HTTPAdapter</span>
+<span class="kn">from</span> <span class="nn">urllib3.util</span> <span class="kn">import</span> <span class="n">Retry</span>
+<span class="kn">import</span> <span class="nn">concurrent.futures</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">urllib</span>
+
+<span class="c1"># Set up logging</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">getLogFilePath</span><span class="p">(),</span> <span class="n">filemode</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">datefmt</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%b-%y %H:%M:%S&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+<span class="c1"># The `SchedulerService` class is a Python class that represents a Windows service for scheduling</span>
+<div class="viewcode-block" id="SchedulerService">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService">[docs]</a>
+<span class="k">class</span> <span class="nc">SchedulerService</span><span class="p">(</span><span class="n">win32serviceutil</span><span class="o">.</span><span class="n">ServiceFramework</span><span class="p">):</span>
+    <span class="n">_svc_name_</span> <span class="o">=</span> <span class="s2">&quot;AutonomousDataCollectionAgent&quot;</span>
+    <span class="n">_svc_display_name_</span> <span class="o">=</span> <span class="s2">&quot;AICoE: Autonomous Data Collection Agent&quot;</span>
+    <span class="n">_file_encryption</span> <span class="o">=</span> <span class="n">fileencryption</span><span class="o">.</span><span class="n">FileEncryption</span><span class="p">()</span>
+    <span class="n">_keycloak_client</span> <span class="o">=</span> <span class="n">keycloak_auth</span><span class="o">.</span><span class="n">KeycloakAuth</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function initializes a service framework and sets a timeout for network requests.</span>
+<span class="sd">        </span>
+<span class="sd">        :param args: The &quot;args&quot; parameter is used to pass command line arguments to the service. It is</span>
+<span class="sd">        typically a list of strings, where each string represents a command line argument. These</span>
+<span class="sd">        arguments can be used to configure or customize the behavior of the service</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">win32serviceutil</span><span class="o">.</span><span class="n">ServiceFramework</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hWaitStop</span> <span class="o">=</span> <span class="n">win32event</span><span class="o">.</span><span class="n">CreateEvent</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">socket</span><span class="o">.</span><span class="n">setdefaulttimeout</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>  <span class="c1"># Set the timeout for network requests</span>
+        <span class="c1"># self.cron = CronTab(&#39;*/30 * * * *&#39;)  # Schedule as per the provided cron format</span>
+
+<div class="viewcode-block" id="SchedulerService.SvcStop">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.SvcStop">[docs]</a>
+    <span class="k">def</span> <span class="nf">SvcStop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `SvcStop` reports the service status as &quot;stop pending&quot; and sets an event to</span>
+<span class="sd">        indicate that the service should stop.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ReportServiceStatus</span><span class="p">(</span><span class="n">win32service</span><span class="o">.</span><span class="n">SERVICE_STOP_PENDING</span><span class="p">)</span>
+        <span class="n">win32event</span><span class="o">.</span><span class="n">SetEvent</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hWaitStop</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SchedulerService.SvcDoRun">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.SvcDoRun">[docs]</a>
+    <span class="k">def</span> <span class="nf">SvcDoRun</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `SvcDoRun` logs a message indicating that a Python service has started and then</span>
+<span class="sd">        calls the `main` function.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">servicemanager</span><span class="o">.</span><span class="n">LogMsg</span><span class="p">(</span><span class="n">servicemanager</span><span class="o">.</span><span class="n">EVENTLOG_INFORMATION_TYPE</span><span class="p">,</span> <span class="n">servicemanager</span><span class="o">.</span><span class="n">PYS_SERVICE_STARTED</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_svc_name_</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="SchedulerService.main">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.main">[docs]</a>
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The main function checks if threading is enabled and processes applications accordingly, with an</span>
+<span class="sd">        option for concurrent threads.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">threading_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get_threading_config</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">threading_config</span><span class="p">[</span><span class="s2">&quot;enabled&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;True&quot;</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">process_applications</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">threading_config</span><span class="p">[</span><span class="s2">&quot;concurrent_threads&quot;</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">win32event</span><span class="o">.</span><span class="n">WaitForSingleObject</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hWaitStop</span><span class="p">,</span> <span class="mi">60000</span><span class="p">)</span> <span class="o">==</span> <span class="n">win32event</span><span class="o">.</span><span class="n">WAIT_OBJECT_0</span><span class="p">:</span>
+                    <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="c1"># if self.cron.next(default_utc=True) &lt;= 0:</span>
+                <span class="c1">#     self.process_applications()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">process_applications</span><span class="p">()</span>
+
+                <span class="c1"># Check for the stop signal every 60 seconds</span>
+                <span class="k">if</span> <span class="n">win32event</span><span class="o">.</span><span class="n">WaitForSingleObject</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hWaitStop</span><span class="p">,</span> <span class="mi">60000</span><span class="p">)</span> <span class="o">==</span> <span class="n">win32event</span><span class="o">.</span><span class="n">WAIT_OBJECT_0</span><span class="p">:</span>
+                    <span class="k">break</span></div>
+
+
+<div class="viewcode-block" id="SchedulerService.update_app_processing_status">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.update_app_processing_status">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_app_processing_status</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function updates the processing status of active applications and their associated</span>
+<span class="sd">        endpoints, and logs the completion of the processing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">all_active_apps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_applications</span><span class="p">()</span><span class="o">.</span><span class="n">get_app_by_status</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">app_id</span> <span class="ow">in</span> <span class="n">all_active_apps</span><span class="p">:</span>
+            <span class="n">app_data</span> <span class="o">=</span> <span class="n">all_active_apps</span><span class="p">[</span><span class="n">app_id</span><span class="p">]</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">endpoint_processing_completed</span><span class="p">(</span><span class="n">app_id</span><span class="p">):</span>
+                <span class="n">current_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+                <span class="n">current_time_str</span> <span class="o">=</span> <span class="n">current_time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">)</span>
+                <span class="n">cron</span> <span class="o">=</span> <span class="n">croniter</span><span class="o">.</span><span class="n">croniter</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;sync_frequency&quot;</span><span class="p">],</span> <span class="n">current_time</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">update_endpoints_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span>  <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;failed_count&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">})</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_get_applications</span><span class="p">()</span><span class="o">.</span><span class="n">update_app</span><span class="p">(</span><span class="n">app_id</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;process_status&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;last_sync&#39;</span><span class="p">:</span> <span class="n">current_time_str</span> <span class="p">,</span> <span class="s1">&#39;next_sync&#39;</span><span class="p">:</span> <span class="n">cron</span><span class="o">.</span><span class="n">get_next</span><span class="p">(</span><span class="n">datetime</span><span class="p">)</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">)})</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;App processing completed: </span><span class="si">{</span><span class="n">app_id</span><span class="si">}</span><span class="s2"> at: </span><span class="si">{</span><span class="n">current_time_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SchedulerService.endpoint_processing_completed">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.endpoint_processing_completed">[docs]</a>
+    <span class="k">def</span> <span class="nf">endpoint_processing_completed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_id</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function checks if all active endpoints for a given app ID have completed processing.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_id: The `app_id` parameter represents the ID of an application</span>
+<span class="sd">        :return: a boolean value indicating whether all active endpoints for a given app ID have</span>
+<span class="sd">        completed processing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">disable_failed_endpoints</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">update_endpoints_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;failed_count&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;failed_count&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">})</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">disable_failed_endpoints</span><span class="p">):</span>
+            <span class="n">disabled_failed_endpoints</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">disable_failed_endpoints</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Disabled the endpoints for App ID: </span><span class="si">{</span><span class="n">app_id</span><span class="si">}</span><span class="s2"> which failed 3 times. Endpiont IDs: </span><span class="si">{</span><span class="n">disabled_failed_endpoints</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">all_active_app_endpoint_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">get_endpoints_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">completed_app_endpoints</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">get_endpoints_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">all_active_app_endpoint_count</span> <span class="o">==</span> <span class="n">completed_app_endpoints</span></div>
+
+    
+<div class="viewcode-block" id="SchedulerService.process_applications">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.process_applications">[docs]</a>
+    <span class="k">def</span> <span class="nf">process_applications</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threading_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">thread_count</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The `process_applications` function processes applications and their associated endpoints,</span>
+<span class="sd">        either sequentially or using multithreading if enabled.</span>
+<span class="sd">        </span>
+<span class="sd">        :param threading_enabled: The `threading_enabled` parameter is a boolean flag that determines</span>
+<span class="sd">        whether the processing of endpoints should be done using multiple threads or not. If set to</span>
+<span class="sd">        `True`, the processing will be done using multiple threads. If set to `False`, the processing</span>
+<span class="sd">        will be done sequentially without using threads, defaults to False (optional)</span>
+<span class="sd">        :param thread_count: The `thread_count` parameter specifies the number of threads to be used for</span>
+<span class="sd">        processing the endpoints. It determines the maximum number of concurrent threads that can be</span>
+<span class="sd">        executed at a time, defaults to 2 (optional)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Get applications which are already under progress</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_app_processing_status</span><span class="p">()</span>
+        <span class="n">applications</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_applications</span><span class="p">()</span><span class="o">.</span><span class="n">get_app_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="p">)</span>
+        <span class="k">for</span> <span class="n">app_id</span> <span class="ow">in</span> <span class="n">applications</span><span class="p">:</span>
+            <span class="n">app_data</span> <span class="o">=</span> <span class="n">applications</span><span class="p">[</span><span class="n">app_id</span><span class="p">]</span>
+            <span class="n">app_name</span> <span class="o">=</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">)):</span>
+                    <span class="k">if</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                            <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">)</span>
+                <span class="n">next_sync_datetime</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;next_sync&quot;</span><span class="p">],</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">)</span>
+                <span class="c1"># Get the current date and time</span>
+                <span class="n">current_datetime</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+                <span class="c1"># Check if next_sync is due to run now</span>
+                <span class="k">if</span> <span class="n">current_datetime</span> <span class="o">&gt;=</span> <span class="n">next_sync_datetime</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;next_sync is due to run now for app ID # </span><span class="si">{</span><span class="n">app_id</span><span class="si">}</span><span class="s2"> with name </span><span class="si">{</span><span class="n">app_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_get_applications</span><span class="p">()</span><span class="o">.</span><span class="n">update_app_process_status</span><span class="p">(</span><span class="n">app_id</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">endpoints</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">get_endpoints_by_query</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;app_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">app_id</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;process_status&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">endpoint_id</span> <span class="ow">in</span> <span class="n">endpoints</span><span class="p">:</span>
+                        <span class="n">endpoint_data</span> <span class="o">=</span> <span class="n">endpoints</span><span class="p">[</span><span class="n">endpoint_id</span><span class="p">]</span>
+                        <span class="n">endpoint_name</span> <span class="o">=</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">update_endpoint_process_status</span><span class="p">(</span><span class="n">endpoint_id</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">threading_enabled</span><span class="p">:</span>
+                                <span class="n">thread_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">thread_count</span><span class="p">)</span>
+                                <span class="k">with</span> <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">thread_count</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>  <span class="c1"># Adjust max_workers as needed</span>
+                                    <span class="n">futures</span> <span class="o">=</span> <span class="p">[]</span>
+                                    <span class="c1"># Wait for all futures to complete</span>
+                                    <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">futures</span><span class="p">)</span>
+                                    <span class="n">future</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">process_endpoint</span><span class="p">,</span> <span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">,</span> <span class="n">next_sync_datetime</span><span class="p">)</span>
+                                    <span class="n">futures</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">future</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">process_endpoint</span><span class="p">(</span><span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">,</span> <span class="n">next_sync_datetime</span><span class="p">)</span>
+                                
+                            <span class="n">last_sync_datetime</span> <span class="o">=</span>  <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s1">&#39;last_sync&#39;</span><span class="p">],</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">)</span>    
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">update_endpoint</span><span class="p">(</span><span class="n">endpoint_id</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;failed_time&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;failed_count&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;last_sync&quot;</span><span class="p">:</span> <span class="n">last_sync_datetime</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">),</span> <span class="s1">&#39;process_status&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">})</span>
+                        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_get_endpoints</span><span class="p">()</span><span class="o">.</span><span class="n">update_endpoint</span><span class="p">(</span><span class="n">endpoint_id</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;failed_time&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">),</span> <span class="s2">&quot;failed_count&quot;</span><span class="p">:</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;failed_count&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">})</span>
+                            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing endpoint ID: </span><span class="si">{</span><span class="n">endpoint_id</span><span class="si">}</span><span class="s2"> with name </span><span class="si">{</span><span class="n">endpoint_name</span><span class="si">}</span><span class="s2">. Error Details : </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing app ID: </span><span class="si">{</span><span class="n">app_id</span><span class="si">}</span><span class="s2"> with name </span><span class="si">{</span><span class="n">app_name</span><span class="si">}</span><span class="s2">. Error Details: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">err</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SchedulerService.process_endpoint">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.process_endpoint">[docs]</a>
+    <span class="k">def</span> <span class="nf">process_endpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">,</span> <span class="n">next_sync_datetime</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function processes an endpoint by making a request, saving the response, and updating the</span>
+<span class="sd">        next sync datetime.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_data: The app_data parameter is the data related to the application that is making</span>
+<span class="sd">        the request. It could include information such as the app&#39;s API key, authentication credentials,</span>
+<span class="sd">        or any other relevant data needed to make the request</span>
+<span class="sd">        :param endpoint_data: The `endpoint_data` parameter is a dictionary that contains information</span>
+<span class="sd">        about the specific endpoint being processed. It may include details such as the endpoint URL,</span>
+<span class="sd">        request method (e.g., GET, POST), headers, and payload data</span>
+<span class="sd">        :param next_sync_datetime: The `next_sync_datetime` parameter is the datetime value indicating</span>
+<span class="sd">        the next scheduled synchronization time for the endpoint. It is used to determine when the</span>
+<span class="sd">        endpoint should be synchronized again</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_request</span><span class="p">(</span><span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">response</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_response</span><span class="p">(</span><span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">next_sync_datetime</span><span class="p">)</span>  </div>
+
+
+<div class="viewcode-block" id="SchedulerService.process_filters">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.process_filters">[docs]</a>
+    <span class="k">def</span> <span class="nf">process_filters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">last_sync</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `process_filters` processes a list of filters by replacing any empty or None values</span>
+<span class="sd">        with the current datetime, specifically for columns named &quot;CREATED_AT&quot;, &quot;UPDATED_AT&quot;, and</span>
+<span class="sd">        &quot;DELETED_AT&quot;.</span>
+<span class="sd">        </span>
+<span class="sd">        :param data: A list of dictionaries, where each dictionary represents a filter. Each dictionary</span>
+<span class="sd">        has two keys: &quot;column_name&quot; and &quot;column_value&quot;. &quot;column_name&quot; represents the name of the column</span>
+<span class="sd">        to filter on, and &quot;column_value&quot; represents the value to filter by</span>
+<span class="sd">        :param last_sync: The last_sync parameter is a variable that represents the last synchronization</span>
+<span class="sd">        time. It is used to determine if a column value is empty or null. If last_sync is None or an</span>
+<span class="sd">        empty string, it is replaced with the current datetime</span>
+<span class="sd">        :return: the modified &quot;data&quot; list after processing the filters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">last_sync</span><span class="p">,</span> <span class="nb">str</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">last_sync</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">last_sync</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">last_sync</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                    <span class="n">last_sync</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-%m-%Y %H:%M:%S&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">column_name</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;column_name&quot;</span><span class="p">)</span>
+            <span class="n">column_value</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;column_value&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">column_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;CREATED_AT&quot;</span><span class="p">,</span> <span class="s2">&quot;UPDATED_AT&quot;</span><span class="p">,</span> <span class="s2">&quot;DELETED_AT&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">column_value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">column_value</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">column_value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                    <span class="c1"># Replace the value with the current datetime</span>
+                    <span class="n">item</span><span class="p">[</span><span class="s2">&quot;column_value&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">last_sync</span>
+        
+        <span class="k">return</span> <span class="n">data</span></div>
+
+    
+<div class="viewcode-block" id="SchedulerService.make_request">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.make_request">[docs]</a>
+    <span class="k">def</span> <span class="nf">make_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The `make_request` function is used to build and send HTTP requests based on provided data and</span>
+<span class="sd">        retrieve all the data from the response.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_data: The `app_data` parameter is a dictionary that contains information about the</span>
+<span class="sd">        application. It includes the following keys:</span>
+<span class="sd">        :param endpoint_data: The `endpoint_data` parameter is a dictionary that contains information</span>
+<span class="sd">        about the specific endpoint to make a request to. It includes the following keys:</span>
+<span class="sd">        :return: a list of all the data retrieved from the API endpoint.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Build the request based on app_data and endpoint_data</span>
+        <span class="n">app_name</span> <span class="o">=</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>    
+        <span class="n">endpoint_name</span> <span class="o">=</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">])</span>
+            <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_payload&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">])</span>
+        
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">])</span>
+            <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_filters&quot;</span><span class="p">]</span>
+        
+        <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">process_filters</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">],</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">])</span>
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">])</span>
+       
+        <span class="k">if</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_page_size&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_page_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_page_size&quot;</span><span class="p">])</span>
+            <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;default_page_size&quot;</span><span class="p">]</span>
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">app_data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;auth_data&quot;</span><span class="p">])</span>
+
+        <span class="n">request_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;filters&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;filters&quot;</span><span class="p">]),</span>
+            <span class="s2">&quot;page_size&quot;</span><span class="p">:</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;page_size&quot;</span><span class="p">],</span>
+        <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">request_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># Add additional payload and headers based on auth_type and auth_data</span>
+        
+        <span class="k">if</span> <span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;BASIC&quot;</span><span class="p">:</span>
+            <span class="n">credentials</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;auth_data&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;key&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;auth_data&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;key&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;secret&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="c1"># Encode the credentials in base64</span>
+            <span class="n">credentials_encoded</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">credentials</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="c1"># Create the header</span>
+            <span class="n">auth_header</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Basic </span><span class="si">{</span><span class="n">credentials_encoded</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Authorization&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">auth_header</span>
+        <span class="k">elif</span> <span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;KEYCLOAK&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_client</span><span class="o">.</span><span class="n">set_auth_data</span><span class="p">(</span><span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auth_data&quot;</span><span class="p">))</span>
+            
+            <span class="n">token</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keycloak_client</span><span class="o">.</span><span class="n">get_token</span><span class="p">()</span>
+            <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;Authorization&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="p">}</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">headers</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;url_scheme&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;https&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">://</span><span class="si">{</span><span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;host&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;localhost&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">endpoint_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;url_endpoint&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;data-export-generic-api&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">endpoint_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;POST&quot;</span><span class="p">)</span>
+        <span class="n">retry_strategy</span> <span class="o">=</span> <span class="n">Retry</span><span class="p">(</span>
+            <span class="n">total</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+            <span class="n">backoff_factor</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">status_forcelist</span><span class="o">=</span><span class="p">[</span><span class="mi">429</span><span class="p">,</span> <span class="mi">500</span><span class="p">,</span> <span class="mi">502</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="mi">504</span><span class="p">],</span>
+            <span class="n">method_whitelist</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;HEAD&quot;</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="s2">&quot;OPTIONS&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">adapter</span> <span class="o">=</span> <span class="n">HTTPAdapter</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="n">retry_strategy</span><span class="p">)</span>
+        <span class="n">http</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+        <span class="n">http</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="s2">&quot;https://&quot;</span><span class="p">,</span> <span class="n">adapter</span><span class="p">)</span>
+        <span class="n">http</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="n">adapter</span><span class="p">)</span>
+        <span class="n">page_number</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">all_data</span> <span class="o">=</span> <span class="p">[]</span>
+        
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">request_data</span><span class="p">[</span><span class="s2">&quot;page_number&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">page_number</span>
+
+            <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">request_data</span> <span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;POST request to </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2"> failed. Endpoint name: </span><span class="si">{</span><span class="n">endpoint_name</span><span class="si">}</span><span class="s2"> App Name :</span><span class="si">{</span><span class="n">app_name</span><span class="si">}</span><span class="s2">. Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Append the query parameters to the URL</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="c1">#url += &quot;?&quot; + &quot;&amp;&quot;.join([f&quot;{key}={value}&quot; for key, value in request_data.items()])</span>
+                    <span class="n">url</span> <span class="o">=</span> <span class="n">url</span> <span class="o">+</span> <span class="s2">&quot;?&quot;</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">urlencode</span><span class="p">(</span><span class="n">request_data</span><span class="p">)</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;GET request to </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2"> failed. Endpoint name: </span><span class="si">{</span><span class="n">endpoint_name</span><span class="si">}</span><span class="s2"> App Name :</span><span class="si">{</span><span class="n">app_name</span><span class="si">}</span><span class="s2">. Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                
+            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+                <span class="n">response_json</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+                <span class="n">total_records</span> <span class="o">=</span> <span class="n">response_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="n">current_page_data</span> <span class="o">=</span> <span class="n">response_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="p">[])</span>
+                <span class="n">all_data</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">current_page_data</span><span class="p">)</span>
+                <span class="n">response_time</span> <span class="o">=</span> <span class="n">response_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;response_time&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">response_json</span><span class="p">:</span>
+                    <span class="c1"># @todo check if response_time is in valid format DD-MM-YYYY hh:mm:ss</span>
+                    <span class="n">endpoint_data</span><span class="p">[</span><span class="s2">&quot;last_sync&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">response_time</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">total_records</span><span class="p">:</span>
+                    <span class="n">page_number</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Request to </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2"> failed with status code </span><span class="si">{</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="si">}</span><span class="s2">. Endpoint name: </span><span class="si">{</span><span class="n">endpoint_name</span><span class="si">}</span><span class="s2"> App Name :</span><span class="si">{</span><span class="n">app_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Request to </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2"> failed with status code </span><span class="si">{</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">all_data</span></div>
+
+
+<div class="viewcode-block" id="SchedulerService.save_response">
+<a class="viewcode-back" href="../../autonomous_data_collection_agent.html#autonomous_data_collection_agent.sheduler.SchedulerService.save_response">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_response</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_data</span><span class="p">,</span> <span class="n">endpoint_data</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">next_sync_datetime</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function saves a response to a JSON file, and if file encryption is enabled, it encrypts the</span>
+<span class="sd">        file.</span>
+<span class="sd">        </span>
+<span class="sd">        :param app_data: The `app_data` parameter is a dictionary that contains information about the</span>
+<span class="sd">        application. It may include various settings, configurations, or other data related to the</span>
+<span class="sd">        application</span>
+<span class="sd">        :param endpoint_data: The `endpoint_data` parameter is a dictionary that contains information</span>
+<span class="sd">        about the endpoint. It typically includes details such as the name of the endpoint, its URL,</span>
+<span class="sd">        request headers, and any other relevant information needed to make the API request</span>
+<span class="sd">        :param response: The `response` parameter is the data that you want to save. It can be any</span>
+<span class="sd">        JSON-serializable object</span>
+<span class="sd">        :param next_sync_datetime: The `next_sync_datetime` parameter is a datetime object that</span>
+<span class="sd">        represents the next scheduled synchronization time. It is used to generate a timestamp for the</span>
+<span class="sd">        folder name where the response will be saved</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dump_path</span> <span class="o">=</span> <span class="n">app_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dump_path&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="n">next_sync_datetime</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">_%H-%M-%S&quot;</span><span class="p">)</span>
+        <span class="n">folder_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dump_path</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">folder_path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">endpoint_name</span> <span class="o">=</span> <span class="n">endpoint_data</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">folder_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">endpoint_name</span><span class="si">}</span><span class="s2">.json&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">file</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_file_encryption</span><span class="o">.</span><span class="n">check_if_enabled</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_file_encryption</span><span class="o">.</span><span class="n">encypt_original_file</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>        </div>
+
+
+    <span class="k">def</span> <span class="nf">_get_endpoints</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">autonomousagent</span><span class="o">.</span><span class="n">Endpoints</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `_get_endpoints` checks if the config file and database file exist, and returns an</span>
+<span class="sd">        instance of `autonomousagent.Endpoints` if they do.</span>
+<span class="sd">        :return: an instance of the `autonomousagent.Endpoints` class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">):</span>
+            <span class="n">db_path</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;endpoint&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                <span class="s1">&#39;Config file not found. Please, run &quot;autonomous_data_collection_agent init&quot;&#39;</span><span class="p">,</span>
+                <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">db_path</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">autonomousagent</span><span class="o">.</span><span class="n">Endpoints</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                <span class="s1">&#39;Database not found. Please, run &quot;autonomous_data_collection_agent init&quot;&#39;</span><span class="p">,</span>
+                <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_applications</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">autonomousagent</span><span class="o">.</span><span class="n">Applications</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The function `_get_applications` checks if the config file and database file exist, and returns</span>
+<span class="sd">        an instance of the `Applications` class if they do.</span>
+<span class="sd">        :return: The method `_get_applications` returns an instance of `autonomousagent.Applications`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">):</span>
+            <span class="n">db_path</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get_database_path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CONFIG_FILE_PATH</span><span class="p">,</span> <span class="s1">&#39;app&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                <span class="s1">&#39;Config file not found. Please, run &quot;autonomous_data_collection_agent init&quot;&#39;</span><span class="p">,</span>
+                <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">db_path</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">autonomousagent</span><span class="o">.</span><span class="n">Applications</span><span class="p">(</span><span class="n">db_path</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typer</span><span class="o">.</span><span class="n">secho</span><span class="p">(</span>
+                <span class="s1">&#39;Database not found. Please, run &quot;autonomous_data_collection_agent init&quot;&#39;</span><span class="p">,</span>
+                <span class="n">fg</span><span class="o">=</span><span class="n">typer</span><span class="o">.</span><span class="n">colors</span><span class="o">.</span><span class="n">RED</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">typer</span><span class="o">.</span><span class="n">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<span class="c1"># this script can be used to run a Windows service.</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">servicemanager</span><span class="o">.</span><span class="n">Initialize</span><span class="p">()</span>
+        <span class="n">servicemanager</span><span class="o">.</span><span class="n">PrepareToHostSingle</span><span class="p">(</span><span class="n">SchedulerService</span><span class="p">)</span>
+        <span class="n">servicemanager</span><span class="o">.</span><span class="n">StartServiceCtrlDispatcher</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">win32serviceutil</span><span class="o">.</span><span class="n">HandleCommandLine</span><span class="p">(</span><span class="n">SchedulerService</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Autonomous Data Collector Agent</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.html">autonomous_data_collection_agent package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autonomous_data_collection_agent.tests.html">autonomous_data_collection_agent.tests package</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Sgt Jai Singh.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

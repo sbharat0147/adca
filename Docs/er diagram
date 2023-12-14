@@ -1,0 +1,96 @@
+
+Below is an example of an ERD for these objects:
+
+       +---------------------+
+       |     Application    |
+       +---------------------+
+       | id (PK)             |
+       | name                |
+       | short_name          |
+       | host                |
+       | url_scheme          |
+       | auth_type           |
+       | auth_data           |
+       | dump_path           |
+       | sync_frequency      |
+       | last_sync           |
+       | next_sync           |
+       | default_payload     |
+       | default_filters     |
+       | default_page_size   |
+       | process_status      |
+       +---------------------+
+               |
+               |
+               |
+               |
+               |
+               |
+               | (1)
+               |
+               |
+       +---------------------+
+       |     Endpoint       |
+       +---------------------+
+       | id (PK)             |
+       | app_id (FK)         |
+       | name                |
+       | url_endpoint        |
+       | method              |
+       | payload             |
+       | filters             |
+       | page_size           |
+       | last_sync           |
+       | process_status      |
+       | failed_count        |
+       | failed_time         |
+       | status              |
+       +---------------------+
+
+       Entities:
+   
+       Endpoint
+           Attributes:
+               id (Primary Key)
+               app_id (Foreign Key referencing Application.id)
+               name
+               url_endpoint
+               method
+               payload
+               filters
+               page_size
+               last_sync
+               process_status
+               failed_count
+               failed_time
+               status
+   
+       Application
+           Attributes:
+               id (Primary Key)
+               name
+               short_name
+               host
+               url_scheme
+               auth_type
+               auth_data
+               dump_path
+               sync_frequency
+               last_sync
+               next_sync
+               default_payload
+               default_filters
+               default_page_size
+               process_status
+   
+       Relationships:
+   
+       Endpoint to Application:
+           An Endpoint is associated with an Application. This is represented by the "app_id" attribute in the Endpoint entity, which is a foreign key referencing the "id" attribute in the Application entity. This relationship signifies that each Endpoint is connected to an Application.
+   
+       Cardinality:
+   
+       Endpoint to Application:
+           Many Endpoints can be associated with one Application, indicating a "Many-to-One" relationship.
+   
+   This ERD provides a visual representation of the relationships between the "endpoint" and "application" objects. You can use a diagramming tool or software like Lucidchart, draw.io, or a database design tool to create a more detailed and organized version of this diagram.
